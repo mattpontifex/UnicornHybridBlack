@@ -14,12 +14,12 @@ class UnicornBlackFunctions():
     """class for data collection using the g.tec Unicorn Hybrid Black
 	"""
     
-    def __init__(self):
+    def __init__(self, deviceID=None, rollingspan=5):
 
         # establish variables
         self.collectversion = '2020.01.07.1'
         self.device = None;
-        self.deviceID = None;
+        self.deviceID = deviceID;
         
         # create a Queue and Lock
         self._queue = Queue()
@@ -28,19 +28,20 @@ class UnicornBlackFunctions():
         # initialize data collectors
         self.logdata = False
         self.logfilename = None
-	self._timetemp = None
+        self._timetemp = None
         self._safetolog = True
         self._logqueue = None
-	self._eventqueue = None
-	self._firsteventlog = True
-        
+        self._eventqueue = None
+        self._eventheaderlog = False
+        self._dataheaderlog = False
+                
         # establish parameters
         self._configuration = None
         self._numberOfAcquiredChannels = None
         self._frameLength = 1
         self._samplefreq = 250.0
         self._intsampletime = 1.0 / self._samplefreq
-        self._rollingspan = 5 # seconds
+        self._rollingspan = rollingspan # seconds
         self.data = None
         self.channellabels = 'Time, FZ, C3, CZ, C4, PZ, O1, OZ, O2, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery'
         self.arrayindx = numpy.array([15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16])
@@ -48,9 +49,7 @@ class UnicornBlackFunctions():
         # activate
         self._receiveBuffer = None
         self.lastsampledpoint = None
-        	
-    def connect(self):
-
+        
         # Did the user specify a particular device
         if (self.deviceID is None):
             try:
@@ -118,13 +117,15 @@ class UnicornBlackFunctions():
         except:
             print("Error starting acquisition.")
             
+        self.logdata = False
         self._ssthread.start()
         self._dpthread.start()
+        print("Connection Complete")
         
     def disconnect(self):
        
         self.stoprecording()       
-	self._streaming = False
+        self._streaming = False
         self._processing = False
         self._ssthread.join()
         self._dpthread.join()
@@ -136,6 +137,7 @@ class UnicornBlackFunctions():
                 
         del self.device
         self.device = None
+        print("Disconnection Complete")
         
     def startrecording(self, logfilename='default'):
         
@@ -143,8 +145,14 @@ class UnicornBlackFunctions():
         self.logfilename = logfilename
         timetemp = str(datetime.now()).split()
         self._timetemp = timetemp[0] + 'T' + timetemp[1]
-        self._logfile = open('%s.csv' % (self.logfilename), 'w')
+        try:
+            self._logfile = open('%s.csv' % (self.logfilename), 'w')
+        except:
+            print("Unable to open log file")
+            
         self._log_header()
+        
+        print("Starting Recording")
 	
     def stoprecording(self):
         
@@ -157,6 +165,7 @@ class UnicornBlackFunctions():
             self._eventlogfile.close()
         except:
             pass
+        print("Stopped Recording")
 
     def _stream_samples(self, queue):
         """Continuously polls the device, and puts all new samples in a
@@ -184,7 +193,7 @@ class UnicornBlackFunctions():
                 queue.put(sampledata)
                 self._lock.release()
             
-            time.sleep(self._intsampletime / 2)
+            time.sleep(self._intsampletime)
                 
     def _process_samples(self, queue):
         """Continuously processes samples, updating the most recent sample
@@ -207,16 +216,16 @@ class UnicornBlackFunctions():
                     # update current sample
                     self.data = numpy.append(self.data, sampledata, 0)
                     self.data = numpy.delete(self.data, (0), axis=0)
-                    self._log_sample(sampledata)
+                    if self.logdata:
+                        self._log_sample(sampledata)
                     
-                    time.sleep(self._intsampletime / 2)
 
     def _log_sample(self, sample):
         """Logs data to the data file
         """
         if self.logdata:
             
-            sample[:,0] = float(float(sample[:,0]) * self._intsampletime) # Convert counter to time
+            sample[:,0] = sample[:,0] * self._intsampletime # Convert counter to time
             sample = sample[:,0:-1] # Trim off validation
             if self._logqueue is None:
                 self._logqueue = sample
@@ -225,6 +234,9 @@ class UnicornBlackFunctions():
                 
             # check if it is safe to log
             if self._safetolog:
+                if not self._dataheaderlog:
+                    self._log_header()
+                
                 numpy.savetxt(self._logfile,self._logqueue,delimiter=',',fmt='%.3f',newline='\n')
                 self._logfile.flush() # internal buffer to RAM
                 os.fsync(self._logfile.fileno()) # RAM file cache to disk
@@ -234,19 +246,25 @@ class UnicornBlackFunctions():
         """Logs data to the event file
         """
         if self.logdata:
-            sample = numpy.array([copy.deepcopy(self.lastsampledpoint), event])
+            
+            sample = [float(self.lastsampledpoint * self._intsampletime), event]
             if self._eventqueue is None:
-		self._eventqueue = sample
+                self._eventqueue = [sample]
             else:
-                self._eventqueue = numpy.vstack([self._eventqueue, sample])
+                self._eventqueue = self._eventqueue.append([self._eventqueue,sample])
 		
             # check if it is safe to log
             if self._safetolog:
-                if self._firsteventlog:
-		    self._log_event_header()
-                numpy.savetxt(self._eventlogfile,self._eventqueue,delimiter=',',fmt='%.3f',newline='\n')
-                self._eventlogfile.flush() # internal buffer to RAM
-                os.fsync(self._eventlogfile.fileno()) # RAM file cache to disk
+                if not self._eventheaderlog:
+                    self._log_event_header()
+                  
+                for incX in range(len(self._eventqueue)):
+                    sample = self._eventqueue[incX]
+                    sample = '%.3f,%s\n' % (sample[0], str(sample[1]))
+                    self._eventlogfile.write(sample) # to internal buffer
+                    self._eventlogfile.flush() # internal buffer to RAM
+                    os.fsync(self._eventlogfile.fileno()) # RAM file cache to disk
+                    
                 self._eventqueue = None
 		
     def _log_header(self):
@@ -266,8 +284,9 @@ class UnicornBlackFunctions():
             self._logfile.write(header) # to internal buffer
             self._logfile.flush() # internal buffer to RAM
             os.fsync(self._logfile.fileno()) # RAM file cache to disk
+            self._dataheaderlog = True  
 
-     def _log_event_header(self):
+    def _log_event_header(self):
         """Logs a header to the event data file
         """
         if self.logdata:
@@ -282,7 +301,7 @@ class UnicornBlackFunctions():
             self._eventlogfile.write(header) # to internal buffer
             self._eventlogfile.flush() # internal buffer to RAM
             os.fsync(self._eventlogfile.fileno()) # RAM file cache to disk  
-            self._firsteventlog = False         
+            self._eventheaderlog = True         
             
             
             
@@ -294,9 +313,7 @@ if __name__ == "__main__":
     from psychopy import core
     
     # connect to Device
-    UnicornBlack = UnicornBlackFunctions()
-    UnicornBlack.deviceID = 'UN-2019.05.51'
-    UnicornBlack.connect()
+    UnicornBlack = UnicornBlackFunctions(deviceID='UN-2019.05.51')   
     
     cumulativeTime = core.Clock(); cumulativeTime.reset()
     
@@ -304,7 +321,7 @@ if __name__ == "__main__":
     
     for incrX in range(10):
         core.wait(1)
-	UnicornBlack.mark_event(incrX)
+        UnicornBlack.mark_event(incrX)
         print("Time Lapsed: %d" % incrX)
     
     UnicornBlack.stoprecording()
@@ -317,13 +334,16 @@ if __name__ == "__main__":
     
     import matplotlib.pyplot as plt 
     sampleddata = UnicornBlack.data
+    sampleddata = sampleddata[~numpy.isnan(sampleddata).any(axis=1)]
     
-    x = []
-    y = []
-    for incrX in range(len(sampleddata)):
-        x.append(sampleddata[incrX][0] * (1 / 250.0))
-        y.append(sampleddata[incrX][0])
-    
-    plt.plot(x,y)
+    if (sampleddata.shape[0]) > 2:
+        x = numpy.arange(sampleddata[0][0],sampleddata[-1][0],1) 
+        y = numpy.array([0] * len(x))
+        for incrX in range(len(sampleddata)):
+            index_min = numpy.argmin(abs(x-(sampleddata[incrX][0])))
+            y[index_min] = sampleddata[incrX][0]
+        
+        x = x * (1/ 250.0)
+        plt.plot(x,y)
 
 # # # # #
