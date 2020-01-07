@@ -120,7 +120,7 @@ function [EEG, command] = loadunicornhybridblack(fullfilename, varargin)
         end
         datacheck = sum(isnan(EEG.data(1,:)));
         if (datacheck > 2)
-            fprintf("Warning: A total of %d out of %d (%.1f) sampling points were dropped during collection", datacheck, EEG.pnts, (datacheck/EEG.pnts)*100)
+            fprintf("Warning: A total of %d out of %d (%.1f%%) sampling points were dropped during collection", datacheck, EEG.pnts, (datacheck/EEG.pnts)*100)
         end
         
         % Use default channel locations
