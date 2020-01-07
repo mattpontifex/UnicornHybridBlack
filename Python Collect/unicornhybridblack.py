@@ -17,19 +17,22 @@ class UnicornBlackFunctions():
     def __init__(self):
 
         # establish variables
-        self.collectversion = '2020.01.06'
+        self.collectversion = '2020.01.07.1'
         self.device = None;
         self.deviceID = None;
         
-		# create a Queue and Lock
+        # create a Queue and Lock
         self._queue = Queue()
         self._lock = Lock()
         
         # initialize data collectors
         self.logdata = False
         self.logfilename = None
+	self._timetemp = None
         self._safetolog = True
         self._logqueue = None
+	self._eventqueue = None
+	self._firsteventlog = True
         
         # establish parameters
         self._configuration = None
@@ -93,7 +96,7 @@ class UnicornBlackFunctions():
         self.data[:] = numpy.nan
         
         try:
-    		# initialize sample streamer
+            # initialize sample streamer
             self._streaming = True
             self._ssthread = Thread(target=self._stream_samples, args=[self._queue], daemon=True)
             self._ssthread.name = 'samplestreamer'
@@ -118,37 +121,42 @@ class UnicornBlackFunctions():
         self._ssthread.start()
         self._dpthread.start()
         
-    
     def disconnect(self):
        
-        self._streaming = False
+        self.stoprecording()       
+	self._streaming = False
         self._processing = False
-        self.logdata = False
+        self._ssthread.join()
+        self._dpthread.join()
+	
         try:
             self.device.StopAcquisition()
         except:
             pass
                 
-        self._ssthread.join()
-        self._dpthread.join()
-        
         del self.device
         self.device = None
         
-    def startacquisition(self):
+    def startrecording(self, logfilename='default'):
         
-        self._streaming = True
-        self._processing = True
-        
-    def stopacquisition(self):
+        self.logdata = True
+        self.logfilename = logfilename
+        timetemp = str(datetime.now()).split()
+        self._timetemp = timetemp[0] + 'T' + timetemp[1]
+        self._logfile = open('%s.csv' % (self.logfilename), 'w')
+        self._log_header()
+	
+    def stoprecording(self):
         
         self.logdata = False
         try:
             self._logfile.close()
         except:
             pass
-        self._streaming = False
-        self._processing = True
+        try:
+            self._eventlogfile.close()
+        except:
+            pass
 
     def _stream_samples(self, queue):
         """Continuously polls the device, and puts all new samples in a
@@ -160,7 +168,7 @@ class UnicornBlackFunctions():
 						into
 		"""
 		
-		# keep streaming until it is signalled that we should stop
+        # keep streaming until it is signalled that we should stop
         while self._streaming:
             # Receives the configured number of samples from the Unicorn device and writes it to the acquisition buffer.
             self.device.GetData(self._frameLength,self._receiveBuffer,self._receiveBufferBufferLength)
@@ -185,9 +193,9 @@ class UnicornBlackFunctions():
 						from
 		"""
 		
-		# keep processing until it is signalled that we should stop
+        # keep processing until it is signalled that we should stop
         while self._processing:    
-			# read new item from the queue
+            # read new item from the queue
             if not queue.empty():
                 self._lock.acquire(True)
                 sampledata = queue.get()
@@ -203,13 +211,6 @@ class UnicornBlackFunctions():
                     
                     time.sleep(self._intsampletime / 2)
 
-    def startloggingdata(self, logfilename='default'):
-        
-        self.logdata = True
-        self.logfilename = logfilename
-        self._logfile = open('%s.csv' % (self.logfilename), 'w')
-        self._log_header()
-        
     def _log_sample(self, sample):
         """Logs data to the data file
         """
@@ -228,20 +229,36 @@ class UnicornBlackFunctions():
                 self._logfile.flush() # internal buffer to RAM
                 os.fsync(self._logfile.fileno()) # RAM file cache to disk
                 self._logqueue = None
-
+		
+    def mark_event(self, event):
+        """Logs data to the event file
+        """
+        if self.logdata:
+            sample = numpy.array([copy.deepcopy(self.lastsampledpoint), event])
+            if self._eventqueue is None:
+		self._eventqueue = sample
+            else:
+                self._eventqueue = numpy.vstack([self._eventqueue, sample])
+		
+            # check if it is safe to log
+            if self._safetolog:
+                if self._firsteventlog:
+		    self._log_event_header()
+                numpy.savetxt(self._eventlogfile,self._eventqueue,delimiter=',',fmt='%.3f',newline='\n')
+                self._eventlogfile.flush() # internal buffer to RAM
+                os.fsync(self._eventlogfile.fileno()) # RAM file cache to disk
+                self._eventqueue = None
+		
     def _log_header(self):
         """Logs a header to the data file
         """
         if self.logdata:
-            # timestamp and note the recording parameters
-            timetemp = str(datetime.now()).split()
-            timetemp = timetemp[0] + 'T' + timetemp[1]
-    
+            
             header = 'collect.....= UnicornPy_' + self.collectversion + '\n'
             header = header + 'device......= ' + self.deviceID  + '\n'
             header = header + ('samplerate..= %.3f' % self._samplefreq)  + '\n'
             header = header + ('channels....= %d' % (self._numberOfAcquiredChannels - 1))  + '\n'
-            header = header + 'date........= ' + timetemp  + '\n'
+            header = header + 'date........= ' + self._timetemp  + '\n'
             header = header + 'filename....= ' + self.logfilename  + '\n'
             
             header = header + self.channellabels + '\n'
@@ -249,9 +266,23 @@ class UnicornBlackFunctions():
             self._logfile.write(header) # to internal buffer
             self._logfile.flush() # internal buffer to RAM
             os.fsync(self._logfile.fileno()) # RAM file cache to disk
-            self._firstlog = False 
 
-            
+     def _log_event_header(self):
+        """Logs a header to the event data file
+        """
+        if self.logdata:
+    
+            self._eventlogfile = open('%s.csve' % (self.logfilename), 'w')
+	
+            header = 'collect.....= UnicornPy_' + self.collectversion + '\n'
+            header = header + 'date........= ' + self._timetemp  + '\n'
+            header = header + 'filename....= ' + self.logfilename  + '\n'
+            header = header + 'Latency, Event' + '\n'
+	
+            self._eventlogfile.write(header) # to internal buffer
+            self._eventlogfile.flush() # internal buffer to RAM
+            os.fsync(self._eventlogfile.fileno()) # RAM file cache to disk  
+            self._firsteventlog = False         
             
             
             
@@ -269,14 +300,13 @@ if __name__ == "__main__":
     
     cumulativeTime = core.Clock(); cumulativeTime.reset()
     
-    UnicornBlack.startacquisition()
-    UnicornBlack.startloggingdata('recordeddata')
+    UnicornBlack.startrecording('recordeddata')
     
     for incrX in range(10):
         core.wait(1)
         print("Time Lapsed: %d" % incrX)
     
-    UnicornBlack.stopacquisition()
+    UnicornBlack.stoprecording()
     
     
     print("Elapsed time: %.6f" % cumulativeTime.getTime())
