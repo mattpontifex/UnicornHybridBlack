@@ -304,10 +304,10 @@ if __name__ == "__main__":
     
     for incrX in range(10):
         core.wait(1)
+	UnicornBlack.mark_event(incrX)
         print("Time Lapsed: %d" % incrX)
     
     UnicornBlack.stoprecording()
-    
     
     print("Elapsed time: %.6f" % cumulativeTime.getTime())
     
