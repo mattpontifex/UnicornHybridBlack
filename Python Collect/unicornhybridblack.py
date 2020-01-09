@@ -10,136 +10,8 @@ from threading import Thread, Lock
 from multiprocessing import Queue
 import UnicornPy
 
-class UnicornBlackFunctions():    
-    """class for data collection using the g.tec Unicorn Hybrid Black
-	"""
+class FunctionsinDevelopment():
     
-    def __init__(self, deviceID=None, rollingspan=15):
-
-        # establish variables
-        self.collectversion = '2020.01.07.1'
-        self.device = None;
-        self.deviceID = deviceID;
-        
-        # create a Queue and Lock
-        self._queue = Queue()
-        self._lock = Lock()
-        
-        # initialize data collectors
-        self.logdata = False
-        self.logfilename = None
-        self._timetemp = None
-        self._safetolog = True
-        self._logqueue = None
-        self._eventqueue = None
-        self._eventheaderlog = False
-        self._dataheaderlog = False
-                
-        # establish parameters
-        self._configuration = None
-        self._numberOfAcquiredChannels = None
-        self._frameLength = 1
-        self._samplefreq = 250.0
-        self._intsampletime = 1.0 / self._samplefreq
-        self._rollingspan = rollingspan # seconds
-        self.data = None
-        self.channellabels = 'Time, FZ, C3, CZ, C4, PZ, O1, OZ, O2, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery'
-        self.arrayindx = numpy.array([15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16])
-                
-        # activate
-        self._receiveBuffer = None
-        self.lastsampledpoint = None
-        
-        # Did the user specify a particular device
-        if (self.deviceID is None):
-            try:
-                # Get available device serials.
-                deviceList = UnicornPy.GetAvailableDevices(True)
-        
-                if len(deviceList) <= 0 or deviceList is None:
-                    raise Exception("No device available.Please pair with a Unicorn first.")
-        
-                # Print available device serials.
-                print("Available devices:")
-                i = 0
-                for device in deviceList:
-                    print("#%i %s" % (i,device))
-                    i+=1
-        
-                # Request device selection.
-                deviceID = int(input("Select device by ID #"))
-                if deviceID < 0 or deviceID > len(deviceList):
-                    raise IndexError('The selected device ID is not valid.')
-                self.deviceID = deviceList[deviceID]
-        
-            except UnicornPy.DeviceException as e:
-                print(e)
-            except Exception as e:
-                print("An unknown error occured. %s" %e)
-                
-        # Open selected device.
-        try:
-            self.device = UnicornPy.Unicorn(self.deviceID)
-            print("Connected to '%s'." %self.deviceID)
-        except:
-            print("Unable to connect to '%s'." %self.deviceID)
-            
-        # Initialize acquisition members.
-        self._numberOfAcquiredChannels = self.device.GetNumberOfAcquiredChannels()
-        self._configuration = self.device.GetConfiguration()
-    
-        # Allocate memory for the acquisition buffer.
-        self._receiveBufferBufferLength = self._frameLength * self._numberOfAcquiredChannels * 4
-        self._receiveBuffer = bytearray(self._receiveBufferBufferLength)
-        #self.data = numpy.empty([ math.floor( float(self._rollingspan) * float(self._samplefreq) ), self._numberOfAcquiredChannels])
-        #self.data[:] = numpy.nan
-        self.data = [[0.0] * self._numberOfAcquiredChannels] * math.floor( float(self._rollingspan) * float(self._samplefreq) )
-                
-        try:
-            # initialize sample streamer
-            self._streaming = True
-            self._ssthread = Thread(target=self._stream_samples, args=[self._queue], daemon=True)
-            self._ssthread.name = 'samplestreamer'
-        except:
-            print("Error initializing sample streamer.")
-        
-        try:
-            # initialize data processer
-            self._processing = True
-            self._dpthread = Thread(target=self._process_samples, args=[self._queue], daemon=True)
-            self._dpthread.name = 'dataprocessor'
-            
-        except:
-            print("Error initializing data recorder.")
-            
-        try:
-            # start processes
-            self.device.StartAcquisition(True)
-        except:
-            print("Error starting acquisition.")
-            
-        self.logdata = False
-        self._ssthread.start()
-        self._dpthread.start()
-        print("Connection Complete")
-        
-    def disconnect(self):
-       
-        self.stoprecording()       
-        self._streaming = False
-        self._processing = False
-        self._ssthread.join()
-        self._dpthread.join()
-	
-        try:
-            self.device.StopAcquisition()
-        except:
-            pass
-                
-        del self.device
-        self.device = None
-        print("Disconnection Complete")
-        
     def startrecording(self, logfilename='default'):
         
         self.logdata = True
@@ -168,61 +40,6 @@ class UnicornBlackFunctions():
             pass
         print("Stopped Recording")
 
-    def _stream_samples(self, queue):
-        """Continuously polls the device, and puts all new samples in a
-		Queue instance
-		
-		arguments
-		
-		queue		--	a multithreading.Queue instance, to put samples
-						into
-		"""
-		
-        # keep streaming until it is signalled that we should stop
-        while self._streaming:
-            # Receives the configured number of samples from the Unicorn device and writes it to the acquisition buffer.
-            self.device.GetData(self._frameLength,self._receiveBuffer,self._receiveBufferBufferLength)
-            
-            # Convert receive buffer to numpy float array 
-            sampledata = numpy.frombuffer(self._receiveBuffer, dtype=numpy.float32, count=self._numberOfAcquiredChannels * self._frameLength)
-            sampledata = numpy.reshape(sampledata, (self._frameLength, self._numberOfAcquiredChannels))
-            sampledata[:] = sampledata[:, self.arrayindx] # put counter first
-            # put the sample in the Queue
-            self.lastsampledpoint = copy.deepcopy(sampledata[0][0])
-            if self._processing:
-                self._lock.acquire(True)
-                queue.put(sampledata)
-                self._lock.release()
-            
-            time.sleep(self._intsampletime)
-                
-    def _process_samples(self, queue):
-        """Continuously processes samples, updating the most recent sample
-				
-		queue		--	a multithreading.Queue instance, to read samples
-						from
-		"""
-		
-        # keep processing until it is signalled that we should stop
-        while self._processing:    
-            # read new item from the queue
-            if not queue.empty():
-                self._lock.acquire(True)
-                sampledata = queue.get()
-                self._lock.release()
-                                
-                # check if the new sample is the same as the current sample
-                if not self.data[-1][0] == sampledata[0][0]:
-                    # update current sample
-                    
-                    #self.data = numpy.append(self.data, sampledata, 0)
-                    #self.data = numpy.delete(self.data, (0), axis=0)
-                    self.data.append(sampledata[0]) 
-                    self.data.pop(0)
-                
-                    #if self.logdata:
-                    #    self._log_sample(sampledata)
-                    
 
     def _log_sample(self, sample):
         """Logs data to the data file
@@ -310,32 +127,228 @@ class UnicornBlackFunctions():
             
             
             
+            
+            
+
+class UnicornBlackFunctions():    
+    """class for data collection using the g.tec Unicorn Hybrid Black
+	"""
+    
+    def __init__(self, deviceID=None, rollingspan=15):
+
+        # establish variables
+        self.collectversion = '2020.01.07.1'
+        self.device = None;
+        self.deviceID = deviceID;
+        
+        # create a Queue and Lock
+        self._queue = Queue()
+        self._lock = Lock()
+        
+        # initialize data collectors
+        self.logdata = False
+        self.logfilename = None
+        self._timetemp = None
+        self._safetolog = True
+        self._logqueue = None
+        self._eventqueue = None
+        self._eventheaderlog = False
+        self._dataheaderlog = False
+                
+        # establish parameters
+        self._configuration = None
+        self._numberOfAcquiredChannels = None
+        self._frameLength = 1
+        self._samplefreq = 250.0
+        self._intsampletime = 1.0 / self._samplefreq
+        self._rollingspan = rollingspan # seconds
+        self.data = None
+        self.channellabels = 'FZ, C3, CZ, C4, PZ, O1, OZ, O2, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Sample, Battery'
+                
+        # activate
+        self._receiveBuffer = None
+        self.lastsampledpoint = None
+        
+        # Did the user specify a particular device
+        if (self.deviceID is None):
+            try:
+                # Get available device serials.
+                deviceList = UnicornPy.GetAvailableDevices(True)
+        
+                if len(deviceList) <= 0 or deviceList is None:
+                    raise Exception("No device available.Please pair with a Unicorn first.")
+        
+                # Print available device serials.
+                print("Available devices:")
+                i = 0
+                for device in deviceList:
+                    print("#%i %s" % (i,device))
+                    i+=1
+        
+                # Request device selection.
+                deviceID = int(input("Select device by ID #"))
+                if deviceID < 0 or deviceID > len(deviceList):
+                    raise IndexError('The selected device ID is not valid.')
+                self.deviceID = deviceList[deviceID]
+        
+            except UnicornPy.DeviceException as e:
+                print(e)
+            except Exception as e:
+                print("An unknown error occured. %s" %e)
+                
+        # Open selected device.
+        try:
+            self.device = UnicornPy.Unicorn(self.deviceID)
+            print("Connected to '%s'." %self.deviceID)
+        except:
+            print("Unable to connect to '%s'." %self.deviceID)
+            
+        # Initialize acquisition members.
+        self._numberOfAcquiredChannels = self.device.GetNumberOfAcquiredChannels()
+        self._configuration = self.device.GetConfiguration()
+    
+        # Allocate memory for the acquisition buffer.
+        self._receiveBufferBufferLength = self._frameLength * self._numberOfAcquiredChannels * 4
+        self._receiveBuffer = bytearray(self._receiveBufferBufferLength)
+        self.data = [[0.0] * self._numberOfAcquiredChannels] * math.floor( float(self._rollingspan) * float(self._samplefreq) )
+                
+        try:
+            # initialize sample streamer
+            self._streaming = True
+            self._ssthread = Thread(target=self._stream_samples, args=[self._queue], daemon=True)
+            self._ssthread.name = 'samplestreamer'
+        except:
+            print("Error initializing sample streamer.")
+        
+        try:
+            # initialize data processer
+            self._processing = True
+            self._dpthread = Thread(target=self._process_samples, args=[self._queue], daemon=True)
+            self._dpthread.name = 'dataprocessor'
+            
+        except:
+            print("Error initializing data recorder.")
+            
+        try:
+            # start processes
+            self.device.StartAcquisition(True)
+        except:
+            print("Error starting acquisition.")
+            
+        self.logdata = False
+        self._ssthread.start()
+        self._dpthread.start()
+        print("Connection Complete")
+        
+    def disconnect(self):
+       
+        #self.stoprecording()       
+        self._streaming = False
+        self._ssthread.join()
+        self._dpthread.join()
+	
+        try:
+            self.device.StopAcquisition()
+        except:
+            pass
+                
+        del self.device
+        self.device = None
+        print("Disconnection Complete")
+        
+    def _stream_samples(self, queue):
+        """Continuously polls the device, and puts all new samples in a
+		Queue instance
+		
+		arguments
+		
+		queue		--	a multithreading.Queue instance, to put samples
+						into
+		"""
+		
+        # keep streaming until it is signalled that we should stop
+        while self._streaming:
+            # Receives the configured number of samples from the Unicorn device and writes it to the acquisition buffer.
+            self.device.GetData(self._frameLength,self._receiveBuffer,self._receiveBufferBufferLength)
+            
+            # Convert receive buffer to numpy float array 
+            sampledata = numpy.frombuffer(self._receiveBuffer, dtype=numpy.float32, count=self._numberOfAcquiredChannels * self._frameLength)
+            sampledata = numpy.reshape(sampledata, (self._frameLength, self._numberOfAcquiredChannels))
+            
+            # put the sample in the Queue
+            #self.lastsampledpoint = copy.deepcopy(sampledata[0][15])
+            self.lastsampledpoint = sampledata[0][15]
+            self._lock.acquire(True)
+            queue.put(sampledata)
+            self._lock.release()
+            
+            time.sleep(self._intsampletime)
+            
+        self._lock.acquire(True)
+        queue.put(None) # poison pill approach
+        self._lock.release()
+                
+    def _process_samples(self, queue):
+        """Continuously processes samples, updating the most recent sample
+				
+		queue		--	a multithreading.Queue instance, to read samples
+						from
+		"""
+		
+        # keep processing until it is signalled that we should stop
+        while self._processing:    
+            # read new item from the queue
+            while not queue.empty():
+                self._lock.acquire(True)
+                sampledata = queue.get()
+                self._lock.release()
+                
+                if sampledata is None:
+                    # Poison pill means shutdown
+                    self._processing = False
+                    break
+                    break
+                else:
+                    # check if the new sample is the same as the current sample
+                    if not self.data[-1][15] == sampledata[0][15]:
+                        # update current sample
+                        self.data.append(sampledata[0]) 
+                        self.data.pop(0)
+                    
+                        #if self.logdata:
+                        #    self._log_sample(sampledata)
+                        
+
+            
+            
+            
 # # # # #
 # DEBUG #
 if __name__ == "__main__":
     
     from psychopy import core
     
+    cumulativeTime = core.Clock(); cumulativeTime.reset()
+    
     # connect to Device
     UnicornBlack = UnicornBlackFunctions(deviceID='UN-2019.05.51')   
     
-    cumulativeTime = core.Clock(); cumulativeTime.reset()
     
     #UnicornBlack.startrecording('recordeddata')
     
     for incrX in range(10):
-        core.wait(1)
+        #core.wait(1)
+        time.sleep(1)
         #UnicornBlack.mark_event(incrX)
-        print("Time Lapsed: %d" % (incrX+1))
+        #print("Time Lapsed: %d second" % (incrX+1))
     
     #UnicornBlack.stoprecording()
     
-    print("Elapsed time: %.6f" % cumulativeTime.getTime())
-    core.wait(5)
     UnicornBlack.disconnect()
-    print('Collection Complete')
     
+    print("Elapsed time: %.6f" % cumulativeTime.getTime())
     
+    # Plotting function to check for dropped samples
     import matplotlib.pyplot as plt 
     sampleddata = UnicornBlack.data
     
@@ -344,18 +357,21 @@ if __name__ == "__main__":
         if not (sampleddata[incrX][0] == float(0)):
             selectsampleddata.append(sampleddata[incrX])
     sampleddata = numpy.array(selectsampleddata)
+    del selectsampleddata
     
     if (sampleddata.shape[0]) > 2:
-        x = numpy.arange(sampleddata[0][0],sampleddata[-1][0],1) 
+        x = numpy.arange(sampleddata[0][15],sampleddata[-1][15],1) 
         y = numpy.array([0] * len(x))
         for incrX in range(len(sampleddata)):
-            index_min = numpy.argmin(abs(x-(sampleddata[incrX][0])))
-            y[index_min] = sampleddata[incrX][0]
-        
+            index_min = numpy.argmin(abs(x-(sampleddata[incrX][15])))
+            y[index_min] = sampleddata[incrX][15]
+        del index_min, incrX
         x = x * (1/ 250.0)
         plt.plot(x,y)
+        print('The recording had a total of %d dropped samples (%0.1f%%).' %(len(y)-numpy.count_nonzero(y), ((len(y)-numpy.count_nonzero(y))/len(y))*100))
 
-    # with logging turned off, it seems like we are only getting a small number of dropped samples!
-    # the data processor seems to be lagging behind quite a bit
+    
+    # core.wait was responsible for the dropped samples!
+    
 
 # # # # #
