@@ -134,7 +134,7 @@ class UnicornBlackFunctions():
             
         try:
             # start processes
-            self.device.StartAcquisition(True)
+            self.device.StartAcquisition(False)
         except:
             print("Error starting acquisition.")
             
