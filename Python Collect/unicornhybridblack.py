@@ -12,56 +12,10 @@ import UnicornPy
 
 class FunctionsinDevelopment():
     
-    def startrecording(self, logfilename='default'):
-        
-        self.logdata = True
-        self.logfilename = logfilename
-        timetemp = str(datetime.now()).split()
-        self._timetemp = timetemp[0] + 'T' + timetemp[1]
-        try:
-            self._logfile = open('%s.csv' % (self.logfilename), 'w')
-        except:
-            print("Unable to open log file")
-            
-        self._log_header()
-        
-        print("Starting Recording")
-	
-    def stoprecording(self):
-        
-        self.logdata = False
-        try:
-            self._logfile.close()
-        except:
-            pass
-        try:
-            self._eventlogfile.close()
-        except:
-            pass
-        print("Stopped Recording")
 
 
-    def _log_sample(self, sample):
-        """Logs data to the data file
-        """
-        if self.logdata:
-            
-            
-            sample = sample[:,0:-1] # Trim off validation
-            if self._logqueue is None:
-                self._logqueue = sample
-            else:
-                self._logqueue = numpy.vstack([self._logqueue, sample])
-                
-            # check if it is safe to log
-            if self._safetolog:
-                if not self._dataheaderlog:
-                    self._log_header()
-                
-                numpy.savetxt(self._logfile,self._logqueue,delimiter=',',fmt='%.3f',newline='\n')
-                self._logfile.flush() # internal buffer to RAM
-                os.fsync(self._logfile.fileno()) # RAM file cache to disk
-                self._logqueue = None
+
+
 		
     def mark_event(self, event):
         """Logs data to the event file
@@ -88,24 +42,7 @@ class FunctionsinDevelopment():
                     
                 self._eventqueue = None
 		
-    def _log_header(self):
-        """Logs a header to the data file
-        """
-        if self.logdata:
-            
-            header = 'collect.....= UnicornPy_' + self.collectversion + '\n'
-            header = header + 'device......= ' + self.deviceID  + '\n'
-            header = header + ('samplerate..= %.3f' % self._samplefreq)  + '\n'
-            header = header + ('channels....= %d' % (self._numberOfAcquiredChannels - 1))  + '\n'
-            header = header + 'date........= ' + self._timetemp  + '\n'
-            header = header + 'filename....= ' + self.logfilename  + '\n'
-            
-            header = header + self.channellabels + '\n'
-            #'Time, FZ, C3, CZ, C4, PZ, O1, OZ, O2, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery'
-            self._logfile.write(header) # to internal buffer
-            self._logfile.flush() # internal buffer to RAM
-            os.fsync(self._logfile.fileno()) # RAM file cache to disk
-            self._dataheaderlog = True  
+ 
 
     def _log_event_header(self):
         """Logs a header to the event data file
@@ -143,14 +80,15 @@ class UnicornBlackFunctions():
         
         # create a Queue and Lock
         self._queue = Queue()
+        self._logsamplequeue = Queue()
         self._lock = Lock()
+        self._loglock = Lock()
         
         # initialize data collectors
         self.logdata = False
         self.logfilename = None
         self._timetemp = None
-        self._safetolog = True
-        self._logqueue = None
+        self._safetolog = False
         self._eventqueue = None
         self._eventheaderlog = False
         self._dataheaderlog = False
@@ -162,8 +100,9 @@ class UnicornBlackFunctions():
         self._samplefreq = 250.0
         self._intsampletime = 1.0 / self._samplefreq
         self._rollingspan = rollingspan # seconds
+        self._logchunksize = int(math.floor(5 * self._samplefreq))
         self.data = None
-        self.channellabels = 'FZ, C3, CZ, C4, PZ, O1, OZ, O2, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Sample, Battery'
+        self.channellabels = 'FZ, C3, CZ, C4, PZ, O1, OZ, O2, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
                 
         # activate
         self._receiveBuffer = None
@@ -223,11 +162,23 @@ class UnicornBlackFunctions():
         try:
             # initialize data processer
             self._processing = True
-            self._dpthread = Thread(target=self._process_samples, args=[self._queue], daemon=True)
+            self._dpthread = Thread(target=self._process_samples, args=[self._queue, self._logsamplequeue], daemon=True)
             self._dpthread.name = 'dataprocessor'
             
         except:
+            print("Error initializing data processer.")
+            
+            
+        try:
+            # initialize data logger
+            self._recording = True
+            self._drthread = Thread(target=self._log_sample, args=[self._logsamplequeue], daemon=True)
+            self._drthread.name = 'datarecorder'
+            
+        except:
             print("Error initializing data recorder.")
+            
+            
             
         try:
             # start processes
@@ -238,6 +189,7 @@ class UnicornBlackFunctions():
         self.logdata = False
         self._ssthread.start()
         self._dpthread.start()
+        self._drthread.start()
         print("Connection Complete")
         
     def disconnect(self):
@@ -246,6 +198,7 @@ class UnicornBlackFunctions():
         self._streaming = False
         self._ssthread.join()
         self._dpthread.join()
+        self._drthread.join()
 	
         try:
             self.device.StopAcquisition()
@@ -288,11 +241,14 @@ class UnicornBlackFunctions():
         queue.put(None) # poison pill approach
         self._lock.release()
                 
-    def _process_samples(self, queue):
-        """Continuously processes samples, updating the most recent sample
+        
+    def _process_samples(self, queue, logqueue):
+        """Continuously processes samples
 				
 		queue		--	a multithreading.Queue instance, to read samples
 						from
+		logqueue	--	a multithreading.Queue instance, to write samples
+						to
 		"""
 		
         # keep processing until it is signalled that we should stop
@@ -314,11 +270,92 @@ class UnicornBlackFunctions():
                         # update current sample
                         self.data.append(sampledata[0]) 
                         self.data.pop(0)
-                    
-                        #if self.logdata:
-                        #    self._log_sample(sampledata)
-                        
+                        self._loglock.acquire(True)
+                        logqueue.put(sampledata)
+                        self._loglock.release()
 
+        self._loglock.acquire(True)
+        logqueue.put(None) # poison pill approach
+        self._loglock.release()
+
+    def _log_sample(self, logqueue):
+        """Continuously log samples
+				
+		queue		--	a multithreading.Queue instance, to read samples
+						from
+		"""
+        
+        templogholding = None
+        finalpush = False
+        # keep trying to log until it is signalled that we should stop
+        while self._recording:   
+            # read new item from the queue 
+            while not logqueue.empty():
+                self._loglock.acquire(True)
+                sampledata = logqueue.get()
+                self._loglock.release()
+                
+                if sampledata is None:
+                    # Poison pill means shutdown
+                    self._recording = False
+                    finalpush = True
+                    break
+                    break
+                else:
+                    if self.logdata:
+                        if templogholding is None:
+                            templogholding = sampledata[:,0:-1]
+                        else:
+                            templogholding = numpy.vstack([templogholding, sampledata[:,0:-1]])
+                            
+                        # check if it is safe to log
+                        if self._safetolog:
+                            # only write chunks of data to save I/O overhead
+                            if (len(templogholding) >= self._logchunksize):
+                                numpy.savetxt(self._logfile,templogholding,delimiter=',',fmt='%.3f',newline='\n')
+                                self._logfile.flush() # internal buffer to RAM
+                                os.fsync(self._logfile.fileno()) # RAM file cache to disk
+                                templogholding = None            
+        if finalpush:
+            if templogholding is not None:
+                numpy.savetxt(self._logfile,templogholding,delimiter=',',fmt='%.3f',newline='\n')
+                self._logfile.flush() # internal buffer to RAM
+                os.fsync(self._logfile.fileno()) # RAM file cache to disk
+                templogholding = None
+
+    def startrecording(self, logfilename='default'):
+        
+        self.logdata = True
+        self.logfilename = logfilename
+        timetemp = str(datetime.now()).split()
+        self._timetemp = timetemp[0] + 'T' + timetemp[1]
+        self._logfile = open('%s.csv' % (self.logfilename), 'w')
+        self._safetolog = True
+        self._log_header()
+        
+        print("Starting Recording")
+	
+                        
+    def _log_header(self):
+        """Logs a header to the data file
+        """
+        if not self._dataheaderlog: 
+            header = 'collect.....= UnicornPy_' + self.collectversion + '\n'
+            header = header + 'device......= ' + self.deviceID  + '\n'
+            header = header + ('samplerate..= %.3f' % self._samplefreq)  + '\n'
+            header = header + ('channels....= %d' % (self._numberOfAcquiredChannels - 1))  + '\n'
+            header = header + 'date........= ' + self._timetemp  + '\n'
+            header = header + 'filename....= ' + self.logfilename  + '\n'
+            
+            header = header + self.channellabels + '\n'
+            #'FZ, C3, CZ, C4, PZ, O1, OZ, O2, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
+            self._logfile.write(header) # to internal buffer
+            self._logfile.flush() # internal buffer to RAM
+            os.fsync(self._logfile.fileno()) # RAM file cache to disk
+            self._dataheaderlog = True 
+            
+
+            
             
             
             
@@ -334,13 +371,12 @@ if __name__ == "__main__":
     UnicornBlack = UnicornBlackFunctions(deviceID='UN-2019.05.51')   
     
     
-    #UnicornBlack.startrecording('recordeddata')
+    UnicornBlack.startrecording('recordeddata')
     
     for incrX in range(10):
-        #core.wait(1)
         time.sleep(1)
         #UnicornBlack.mark_event(incrX)
-        #print("Time Lapsed: %d second" % (incrX+1))
+        print("Time Lapsed: %d second" % (incrX+1))
     
     #UnicornBlack.stoprecording()
     
