@@ -4,68 +4,11 @@ import os
 import math
 import numpy
 import time
-import copy
 from datetime import datetime
 from threading import Thread, Lock
 from multiprocessing import Queue
 import UnicornPy
 
-class FunctionsinDevelopment():
-    
-
-
-
-
-		
-    def mark_event(self, event):
-        """Logs data to the event file
-        """
-        if self.logdata:
-            
-            sample = [float(self.lastsampledpoint * self._intsampletime), event]
-            if self._eventqueue is None:
-                self._eventqueue = [sample]
-            else:
-                self._eventqueue = self._eventqueue.append([self._eventqueue,sample])
-		
-            # check if it is safe to log
-            if self._safetolog:
-                if not self._eventheaderlog:
-                    self._log_event_header()
-                  
-                for incX in range(len(self._eventqueue)):
-                    sample = self._eventqueue[incX]
-                    sample = '%.3f,%s\n' % (sample[0], str(sample[1]))
-                    self._eventlogfile.write(sample) # to internal buffer
-                    self._eventlogfile.flush() # internal buffer to RAM
-                    os.fsync(self._eventlogfile.fileno()) # RAM file cache to disk
-                    
-                self._eventqueue = None
-		
- 
-
-    def _log_event_header(self):
-        """Logs a header to the event data file
-        """
-        if self.logdata:
-    
-            self._eventlogfile = open('%s.csve' % (self.logfilename), 'w')
-	
-            header = 'collect.....= UnicornPy_' + self.collectversion + '\n'
-            header = header + 'date........= ' + self._timetemp  + '\n'
-            header = header + 'filename....= ' + self.logfilename  + '\n'
-            header = header + 'Latency, Event' + '\n'
-	
-            self._eventlogfile.write(header) # to internal buffer
-            self._eventlogfile.flush() # internal buffer to RAM
-            os.fsync(self._eventlogfile.fileno()) # RAM file cache to disk  
-            self._eventheaderlog = True         
-            
-            
-            
-            
-            
-            
 
 class UnicornBlackFunctions():    
     """class for data collection using the g.tec Unicorn Hybrid Black
@@ -74,23 +17,23 @@ class UnicornBlackFunctions():
     def __init__(self, deviceID=None, rollingspan=15):
 
         # establish variables
-        self.collectversion = '2020.01.07.1'
+        self.collectversion = '2020.01.09.2'
         self.device = None;
         self.deviceID = deviceID;
         
         # create a Queue and Lock
         self._queue = Queue()
         self._logsamplequeue = Queue()
+        self._logeventqueue = Queue()
         self._lock = Lock()
         self._loglock = Lock()
+        self._logeventlock = Lock()
         
         # initialize data collectors
         self.logdata = False
         self.logfilename = None
         self._timetemp = None
         self._safetolog = False
-        self._eventqueue = None
-        self._eventheaderlog = False
         self._dataheaderlog = False
                 
         # establish parameters
@@ -179,6 +122,15 @@ class UnicornBlackFunctions():
             print("Error initializing data recorder.")
             
             
+        try:
+            # initialize data logger
+            self._eventrecording = True
+            self._erthread = Thread(target=self._log_event, args=[self._logeventqueue], daemon=True)
+            self._erthread.name = 'eventrecorder'
+            
+        except:
+            print("Error initializing event recorder.")
+            
             
         try:
             # start processes
@@ -190,6 +142,7 @@ class UnicornBlackFunctions():
         self._ssthread.start()
         self._dpthread.start()
         self._drthread.start()
+        self._erthread.start()
         print("Connection Complete")
         
     def disconnect(self):
@@ -199,6 +152,7 @@ class UnicornBlackFunctions():
         self._ssthread.join()
         self._dpthread.join()
         self._drthread.join()
+        self._erthread.join()
 	
         try:
             self.device.StopAcquisition()
@@ -240,7 +194,7 @@ class UnicornBlackFunctions():
         self._lock.acquire(True)
         queue.put(None) # poison pill approach
         self._lock.release()
-                
+        self._eventrecording = False
         
     def _process_samples(self, queue, logqueue):
         """Continuously processes samples
@@ -323,6 +277,64 @@ class UnicornBlackFunctions():
                 os.fsync(self._logfile.fileno()) # RAM file cache to disk
                 templogholding = None
 
+
+    def _log_event(self, logeventqueue):
+        """Continuously log events
+				
+		logeventqueue	--	a multithreading.Queue instance, to read samples
+						from
+		"""
+        eventheaderlog = False
+        templogholding = None
+        # keep trying to log until it is signalled that we should stop
+        while self._eventrecording:   
+            # read new item from the queue 
+            while not logeventqueue.empty():
+                self._logeventlock.acquire(True)
+                sampledata = logeventqueue.get()
+                self._logeventlock.release()
+            
+                # wait to create file until we know there is a need
+                if self.logdata:
+                    if not eventheaderlog:
+                        header = 'collect.....= UnicornPy_' + self.collectversion + '\n'
+                        header = header + 'date........= ' + self._timetemp  + '\n'
+                        header = header + 'filename....= ' + self.logfilename  + '\n'
+                        header = header + 'Latency, Event' + '\n'
+                        self._eventlogfile = open('%s.csve' % (self.logfilename), 'w')
+                        self._eventlogfile.write(header) # to internal buffer
+                        self._eventlogfile.flush() # internal buffer to RAM
+                        os.fsync(self._eventlogfile.fileno()) # RAM file cache to disk  
+                        eventheaderlog = True 
+                    
+                if sampledata is None:
+                    # Poison pill means shutdown
+                    self._eventrecording = False
+                    break
+                    break
+                else:
+                    if self.logdata:
+                        if templogholding is None:
+                            templogholding = sampledata
+                        else:
+                            templogholding = numpy.vstack([templogholding, sampledata])
+                            
+                        # check if it is safe to log
+                        if self._safetolog:
+                            # only write chunks of data to save I/O overhead
+                            if (len(templogholding) >= self._logchunksize):
+                                numpy.savetxt(self._eventlogfile,templogholding,delimiter=',',fmt='%.3f',newline='\n')
+                                self._eventlogfile.flush() # internal buffer to RAM
+                                os.fsync(self._eventlogfile.fileno()) # RAM file cache to disk
+                                templogholding = None            
+        
+        if templogholding is not None:
+                numpy.savetxt(self._eventlogfile,templogholding,delimiter=',',fmt='%s',newline='\n')
+                self._eventlogfile.flush() # internal buffer to RAM
+                os.fsync(self._eventlogfile.fileno()) # RAM file cache to disk
+                templogholding = None
+        
+        
     def startrecording(self, logfilename='default'):
         
         self.logdata = True
@@ -353,9 +365,17 @@ class UnicornBlackFunctions():
             self._logfile.flush() # internal buffer to RAM
             os.fsync(self._logfile.fileno()) # RAM file cache to disk
             self._dataheaderlog = True 
+       
             
+    def mark_event(self, event):
+        """Logs data to the event file
+        """
+        if self.lastsampledpoint is not None:
+            self._logeventlock.acquire(True)
+            self._logeventqueue.put(numpy.array([str(int(self.lastsampledpoint)), str(event)]))
+            self._logeventlock.release()
+        
 
-            
             
             
             
@@ -367,7 +387,6 @@ if __name__ == "__main__":
     
     cumulativeTime = core.Clock(); cumulativeTime.reset()
     
-    # connect to Device
     UnicornBlack = UnicornBlackFunctions(deviceID='UN-2019.05.51')   
     
     
@@ -375,11 +394,9 @@ if __name__ == "__main__":
     
     for incrX in range(10):
         time.sleep(1)
-        #UnicornBlack.mark_event(incrX)
+        UnicornBlack.mark_event(incrX)
         print("Time Lapsed: %d second" % (incrX+1))
-    
-    #UnicornBlack.stoprecording()
-    
+        
     UnicornBlack.disconnect()
     
     print("Elapsed time: %.6f" % cumulativeTime.getTime())
