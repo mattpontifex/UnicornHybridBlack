@@ -14,7 +14,7 @@ class UnicornBlackFunctions():
     """class for data collection using the g.tec Unicorn Hybrid Black
 	"""
     
-    def __init__(self, deviceID=None, rollingspan=5):
+    def __init__(self, deviceID=None, rollingspan=15):
 
         # establish variables
         self.collectversion = '2020.01.07.1'
@@ -91,9 +91,10 @@ class UnicornBlackFunctions():
         # Allocate memory for the acquisition buffer.
         self._receiveBufferBufferLength = self._frameLength * self._numberOfAcquiredChannels * 4
         self._receiveBuffer = bytearray(self._receiveBufferBufferLength)
-        self.data = numpy.empty([ math.floor( float(self._rollingspan) * float(self._samplefreq) ), self._numberOfAcquiredChannels])
-        self.data[:] = numpy.nan
-        
+        #self.data = numpy.empty([ math.floor( float(self._rollingspan) * float(self._samplefreq) ), self._numberOfAcquiredChannels])
+        #self.data[:] = numpy.nan
+        self.data = [[0.0] * self._numberOfAcquiredChannels] * math.floor( float(self._rollingspan) * float(self._samplefreq) )
+                
         try:
             # initialize sample streamer
             self._streaming = True
@@ -185,9 +186,9 @@ class UnicornBlackFunctions():
             # Convert receive buffer to numpy float array 
             sampledata = numpy.frombuffer(self._receiveBuffer, dtype=numpy.float32, count=self._numberOfAcquiredChannels * self._frameLength)
             sampledata = numpy.reshape(sampledata, (self._frameLength, self._numberOfAcquiredChannels))
-            
+            sampledata[:] = sampledata[:, self.arrayindx] # put counter first
             # put the sample in the Queue
-            self.lastsampledpoint = copy.deepcopy(sampledata[0][15])
+            self.lastsampledpoint = copy.deepcopy(sampledata[0][0])
             if self._processing:
                 self._lock.acquire(True)
                 queue.put(sampledata)
@@ -209,15 +210,18 @@ class UnicornBlackFunctions():
                 self._lock.acquire(True)
                 sampledata = queue.get()
                 self._lock.release()
-                
+                                
                 # check if the new sample is the same as the current sample
-                sampledata[:] = sampledata[:, self.arrayindx] # put counter first
-                if not self.data[-1][0] == sampledata[0,0]:
+                if not self.data[-1][0] == sampledata[0][0]:
                     # update current sample
-                    self.data = numpy.append(self.data, sampledata, 0)
-                    self.data = numpy.delete(self.data, (0), axis=0)
-                    if self.logdata:
-                        self._log_sample(sampledata)
+                    
+                    #self.data = numpy.append(self.data, sampledata, 0)
+                    #self.data = numpy.delete(self.data, (0), axis=0)
+                    self.data.append(sampledata[0]) 
+                    self.data.pop(0)
+                
+                    #if self.logdata:
+                    #    self._log_sample(sampledata)
                     
 
     def _log_sample(self, sample):
@@ -225,7 +229,7 @@ class UnicornBlackFunctions():
         """
         if self.logdata:
             
-            sample[:,0] = sample[:,0] * self._intsampletime # Convert counter to time
+            
             sample = sample[:,0:-1] # Trim off validation
             if self._logqueue is None:
                 self._logqueue = sample
@@ -317,24 +321,29 @@ if __name__ == "__main__":
     
     cumulativeTime = core.Clock(); cumulativeTime.reset()
     
-    UnicornBlack.startrecording('recordeddata')
+    #UnicornBlack.startrecording('recordeddata')
     
     for incrX in range(10):
         core.wait(1)
-        UnicornBlack.mark_event(incrX)
-        print("Time Lapsed: %d" % incrX)
+        #UnicornBlack.mark_event(incrX)
+        print("Time Lapsed: %d" % (incrX+1))
     
-    UnicornBlack.stoprecording()
+    #UnicornBlack.stoprecording()
     
     print("Elapsed time: %.6f" % cumulativeTime.getTime())
-    
+    core.wait(5)
     UnicornBlack.disconnect()
     print('Collection Complete')
     
     
     import matplotlib.pyplot as plt 
     sampleddata = UnicornBlack.data
-    sampleddata = sampleddata[~numpy.isnan(sampleddata).any(axis=1)]
+    
+    selectsampleddata = []
+    for incrX in range(len(sampleddata)):
+        if not (sampleddata[incrX][0] == float(0)):
+            selectsampleddata.append(sampleddata[incrX])
+    sampleddata = numpy.array(selectsampleddata)
     
     if (sampleddata.shape[0]) > 2:
         x = numpy.arange(sampleddata[0][0],sampleddata[-1][0],1) 
@@ -345,5 +354,8 @@ if __name__ == "__main__":
         
         x = x * (1/ 250.0)
         plt.plot(x,y)
+
+    # with logging turned off, it seems like we are only getting a small number of dropped samples!
+    # the data processor seems to be lagging behind quite a bit
 
 # # # # #
