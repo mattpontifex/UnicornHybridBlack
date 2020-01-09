@@ -71,7 +71,7 @@ function [EEG, command] = loadunicornhybridblack(fullfilename, varargin)
         endRow = 7;
         formatSpec = '%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%[^\n\r]';
         dataArray = textscan(fileID, formatSpec, endRow-startRow+1, 'Delimiter', delimiter, 'TextType', 'string', 'HeaderLines', startRow-1, 'ReturnOnError', false, 'EndOfLine', '\r\n');
-        labels = [dataArray{2:end-1}];
+        labels = [dataArray{1:end-2}];
         fclose(fileID);
         
         % Populate channel labels
@@ -81,7 +81,7 @@ function [EEG, command] = loadunicornhybridblack(fullfilename, varargin)
             EEG.chanlocs(cC).urchan = cC;
         end
         EEG.nbchan = nbchan-1;
-        EEG.setname = 'EEG file';
+        EEG.setname = name;
         datafileextension = '.csv';
         EEG.filename = [name, datafileextension];
         EEG.filepath = filepath;
@@ -105,23 +105,22 @@ function [EEG, command] = loadunicornhybridblack(fullfilename, varargin)
         datain = [dataArray{1:end-1}];
         fclose(fileID);
         
-        EEG.times = [datain(1,1):(1/samplerate):datain(end,1)];
-        EEG.xmin = EEG.times(1);
-        EEG.xmax = EEG.times(end);
+        % make sure all the points are at the correct times
+        samplingpoints = [datain(1,end):1:datain(end,end)];
+        EEG.times = samplingpoints * (1/samplerate); % change samples to time
         EEG.pnts = size(EEG.times,2);
-        
-        % because of the issues with the eyetracker lets just make sure
-        % that all the points are in the correct spots...
         EEG.data = NaN(EEG.nbchan, EEG.pnts);
         for indxi = 1:size(datain,1)
-            currentsample = datain(indxi,1);
-            [~, eventtime] = min(abs(EEG.times - (currentsample)));
-            EEG.data(:,eventtime) = datain(indxi,2:end)';
+            currentsample = datain(indxi,end);
+            [~, eventtime] = min(abs(samplingpoints - (currentsample)));
+            EEG.data(:,eventtime) = datain(indxi,1:end-1)';
         end
         datacheck = sum(isnan(EEG.data(1,:)));
         if (datacheck > 2)
             fprintf("Warning: A total of %d out of %d (%.1f%%) sampling points were dropped during collection", datacheck, EEG.pnts, (datacheck/EEG.pnts)*100)
         end
+        EEG.xmin = EEG.times(1);
+        EEG.xmax = EEG.times(end);
         
         % Use default channel locations
         try
@@ -145,23 +144,70 @@ function [EEG, command] = loadunicornhybridblack(fullfilename, varargin)
         end
         EEG.history = sprintf('%s\nEEG = loadunicornhybridblack(''%s%s'');', EEG.history, filepath, [name, datafileextension]);
         
-%         % Put triggers in
-%         EEG.event = struct('type', [], 'latency', [], 'urevent', []);
-%         EEG.urevent = struct('type', [], 'latency', []);
-%         tempdat = double(datain(:,double(headerin(find(strcmpi(headerin,'channelCount'),1)+1))+2));
-%         
-%         % log each marker
-%         changedIndexeslocations = find(tempdat > 0);
-%         if (numel(changedIndexeslocations) > 0)
-%             for cC = 1:size(changedIndexeslocations,1)
-%                 EEG.event(cC).urevent = cC;
-%                 EEG.event(cC).type = tempdat(changedIndexeslocations(cC));
-%                 EEG.event(cC).latency = double(changedIndexeslocations(cC));
-%                 EEG.urevent(cC).type = tempdat(changedIndexeslocations(cC));
-%                 EEG.urevent(cC).latency = double(changedIndexeslocations(cC));
-%             end
-%            
-%         end
+        % Put triggers in
+        EEG.event = struct('type', [], 'latency', [], 'urevent', []);
+        EEG.urevent = struct('type', [], 'latency', []);
+        
+        % see if there are events available
+        if ~(exist([file '.csve'], 'file') == 0)
+        
+            % load data headers
+            fileID = fopen([file '.csve'],'r');
+            delimiter = ',';
+            startRow = 5;
+            endRow = 5;
+            formatSpec = '%s%s%[^\n\r]';
+            dataArray = textscan(fileID, formatSpec, 'Delimiter', delimiter, 'TextType', 'string', 'HeaderLines' ,startRow-1, 'ReturnOnError', false, 'EndOfLine', '\r\n');
+            Latency = dataArray{:, 1};
+            Event = dataArray{:, 2};
+            fclose(fileID);
+            
+            
+            for indxi = 1:size(Latency,1)
+                EEG.event(indxi).urevent = indxi;
+                EEG.event(indxi).type = str2double(Event(indxi,1));
+                EEG.urevent(indxi).type = str2double(Event(indxi,1));
+                
+                currentsample = str2double(Latency(indxi,1));
+                [~, eventtime] = min(abs(samplingpoints - (currentsample)));
+                
+                EEG.event(indxi).latency = double(eventtime);
+                EEG.urevent(indxi).latency = double(eventtime);
+            end
+            
+        end
+        
+        % Handle Epoched Datasets
+        
+        % Check to See if Behavioral Data is Available
+        % Neurscan STIM2 Data is stored with the same file type as the  EEG data in Curry 6 & 7 which is problematic
+        % Check for PsychoPy .PSYDAT file
+        % 'Trial','Event','Duration','ISI','ITI','Type','Resp','Correct','Latency','ClockLatency','Trigger','MinRespWin','MaxRespWin','Stimulus'
+        AltFile = [file '.psydat'];
+        try
+            if ~strcmpi(r.AltFile, 'False')
+                AltFile = r.AltFile;
+            end
+        catch
+            boolerr = 1;
+        end
+        if ~(exist(AltFile, 'file') == 0) 
+
+            fid = fopen(AltFile,'rt');
+            if (fid ~= -1)
+                cell = textscan(fid,'%s');
+                fclose(fid);
+                cont = cell{1};
+
+                % Check file version
+                if strcmpi(cont(1,1),'gentask.....=') % Could be Neuroscan Stim2 or modified Psychopy formats
+                    if strcmpi(cont(2,1),'PsychoPy_Engine_3')
+                        EEG = importengine3psychopy(EEG, AltFile, 'Force', r.Force, 'Skip', skipcodes);
+                    end
+                end
+            end
+        end
+        
         
         EEG = eeg_checkset(EEG);
         EEG.history = sprintf('%s\nEEG = eeg_checkset(EEG);', EEG.history);
