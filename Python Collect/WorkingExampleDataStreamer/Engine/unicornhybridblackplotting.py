@@ -4,6 +4,7 @@
 import math
 import numpy
 import scipy.signal
+import matplotlib.mlab as mlab
 from bokeh.io import output_file, show
 from bokeh.layouts import row, column, widgetbox
 from bokeh.plotting import curdoc, figure, ColumnDataSource
@@ -16,7 +17,6 @@ import time
 from tornado import gen
 
 # features to add
-# compute frequency spectrum to determine if a channel is bad
 # plot spectrum instead of time - would have to be another tab with 4 x 4 grid of bar plots
 
 
@@ -49,7 +49,9 @@ class UnicornBlackFunctions():
         blp, alp = scipy.signal.butter(2, (self._filtersettings[1] / (self._samplefreq / 2)))
         self._hpfiltersettings = [bhp, ahp]
         self._lpfiltersettings = [blp, alp]
-        
+        self._badchannelbools = [False] * self._numberOfAcquiredChannels
+        self._power = []
+        self._freqs = []
 
     def startvisualization(self):
         
@@ -92,7 +94,7 @@ class UnicornBlackFunctions():
         self.plots[cC].min_border_left = 50
         
         for cL in range(self._numberOfAcquiredChannels):
-           self.lines.append(self.plots[0].line(x='Time', y=self.channellabels[cL], source=self.source, color=self.colorpalet[cL], line_width=1, alpha=0.8))
+           self.lines.append(self.plots[0].line(x='Time', y=self.channellabels[cL], source=self.source, color=self.colorpalet[cL], line_width=1, alpha=0.9))
            self.channeltext.append(Label(x=0, y=((cL + 1)*self._scale), x_offset=-45, x_units='data', y_units='data',text=self.channellabels[cL], text_font_size="20pt", text_color=self.colorpalet[cL], render_mode='css', background_fill_alpha=0.0, text_baseline="middle"))
            self.plots[cC].add_layout(self.channeltext[cL])
         
@@ -140,8 +142,20 @@ class UnicornBlackFunctions():
 
     def _computedatafilter(self, presource):
         
-        if (self._filterdata):
-            for cC in range(self._numberOfAcquiredChannels):
+        # check bad channels
+        for cC in range(self._numberOfAcquiredChannels):
+            self._power, self._freqs = mlab.psd(x=presource[self.channellabels[cC]], NFFT=self._scale, Fs=self._samplefreq, noverlap=int(self._rollingspanpoints/3.0), sides='onesided', scale_by_freq=True)
+            
+            nonnoise = numpy.mean(self._power[numpy.argmin(abs(self._freqs-(35))):numpy.argmin(abs(self._freqs-(50)))])
+            noise = numpy.mean(self._power[numpy.argmin(abs(self._freqs-(55))):numpy.argmin(abs(self._freqs-(65)))])
+            if ((noise / float(nonnoise)) > 1.5):
+                self._badchannelbools[cC] = True
+                self.channeltext[cC].text_color='red'
+            else:
+                self._badchannelbools[cC] = False
+                self.channeltext[cC].text_color=self.colorpalet[cC]
+        
+            if (self._filterdata):
                 tempdata = scipy.signal.filtfilt(self._hpfiltersettings[0], self._hpfiltersettings[1], presource[self.channellabels[cC]], method="gust") # High pass:
                 presource[self.channellabels[cC]] = scipy.signal.filtfilt(self._lpfiltersettings[0], self._lpfiltersettings[1], tempdata, method="gust") # low pass:
             
@@ -153,6 +167,7 @@ class UnicornBlackFunctions():
         
         # but update the document from callback
         self.updatesamples()
+        self._badchannelbools[3] = False
         self.scaletext.text = ('Scale %.1f microvolts' % float(self._scale / float(self._datascale)))
         
     def _scaledown(self):
@@ -160,6 +175,7 @@ class UnicornBlackFunctions():
         
         # but update the document from callback
         self.updatesamples()
+        self._badchannelbools[3] = True
         self.scaletext.text = ('Scale %.1f microvolts' % float(self._scale / float(self._datascale)))
 
     @gen.coroutine
@@ -172,11 +188,17 @@ class UnicornBlackFunctions():
         nres = self._computedataoffset(res)
         
         self.source.data = nres
+        # turn channel label red if bad
+        for cC in range(self._numberOfAcquiredChannels):
+            if self._badchannelbools[cC]:
+                self.channeltext[cC].text_color='red'
+            else:
+                self.channeltext[cC].text_color=self.colorpalet[cC]
 
     def blocking_task(self):
         while True:
             # do some blocking computation
-            examplesamples = 15
+            examplesamples = 20
             time.sleep((0.004) * examplesamples)
             for cS in range(examplesamples):
                 newdatapoints = numpy.ndarray.tolist(numpy.multiply(numpy.random.rand(self._numberOfAcquiredChannels), 100))
