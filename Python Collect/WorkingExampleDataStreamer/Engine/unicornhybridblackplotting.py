@@ -8,7 +8,7 @@ import matplotlib.mlab as mlab
 from bokeh.io import output_file, show
 from bokeh.layouts import row, column, widgetbox
 from bokeh.plotting import curdoc, figure, ColumnDataSource
-from bokeh.models.widgets import Button, Toggle
+from bokeh.models.widgets import Button, Toggle, Panel, Tabs
 from bokeh.models.annotations import Label
 from bokeh.palettes import viridis
 from functools import partial
@@ -50,8 +50,18 @@ class UnicornBlackFunctions():
         self._hpfiltersettings = [bhp, ahp]
         self._lpfiltersettings = [blp, alp]
         self._badchannelbools = [False] * self._numberOfAcquiredChannels
-        self._power = []
-        self._freqs = []
+        self.freqdata = []
+        self.freqdatalength = 0
+        for cP in range(self._numberOfAcquiredChannels):
+            _power, tempfreqs = mlab.psd(x=self.data[cP], NFFT=self._scale, Fs=self._samplefreq, noverlap=int(self._rollingspanpoints/3.0), sides='onesided', scale_by_freq=True)
+            self.freqdata.append(_power) 
+        self.freqdatalength = len(_power)
+        self._freqs = numpy.ndarray.tolist(tempfreqs)
+        self._freqstep = tempfreqs[1]-tempfreqs[0]
+        # grow the frequency list
+        while len(self._freqs) < self._rollingspanpoints:
+            self._freqs.append(float(self._freqs[-1]) + float(self._freqstep))
+        self._freqs = numpy.array(self._freqs)
 
     def startvisualization(self):
         
@@ -64,6 +74,8 @@ class UnicornBlackFunctions():
         self.source = ColumnDataSource(self.res)
                     
         output_file("UnicornBlackDataVisualizer.html")
+                
+        # time series
         self.plots = []
         self.lines = []
         self.channeltext = []
@@ -79,7 +91,7 @@ class UnicornBlackFunctions():
                  y_range=(0, (self._numberOfAcquiredChannels+1)*self._scale),    
                  plot_height=850,
                  plot_width=1400,         
-                 title='Streaming Data',
+                 title='',
                  title_location='above',
                  tools=""))
         self.plots[cC].toolbar.autohide = True
@@ -100,11 +112,6 @@ class UnicornBlackFunctions():
         
         self.scaletext = Label(x=(self._rollingspan + 0.05), y=5, y_offset=0, x_units='data', y_units='data',text=('Scale %.1f microvolts' % float(self._scale / float(self._datascale))), text_font_size="8pt", text_color='gray', render_mode='css', background_fill_alpha=0.0, text_baseline="middle")
         self.plots[cC].add_layout(self.scaletext)
-        # This is important! Save curdoc() to make sure all threads
-        # see the same document.
-        self.doc = curdoc()
-        
-        self.doc.add_root(self.plots[0])
         
         # add a button widget and configure with the call back
         Scaleupbutton = Button(label="Scaleup")
@@ -115,7 +122,51 @@ class UnicornBlackFunctions():
         self.Filterdatabutton = Toggle(label="Turn on Data Filter")
         self.Filterdatabutton.on_click(self.filtertoggle_handler)
         
-        self.doc.add_root(row(Scaledownbutton,Scaleupbutton,self.Filterdatabutton))
+        # frequency plots
+        self.freqplots = []
+        self.freqlines = []
+        for cP in range(self._numberOfAcquiredChannels):
+            self.freqplots.append(figure(
+                             x_axis_label='Frequency',
+                             x_axis_type='linear',
+                             x_axis_location='below',
+                             x_range=(0, 125),         
+                             y_axis_label='',
+                             y_axis_type='linear',
+                             y_axis_location='left',
+                             y_range=(0, 100),    
+                             plot_height=400,
+                             plot_width=350,         
+                             title=self.channellabels[cP],
+                             title_location='above',
+                             tools=""))
+            self.freqplots[cP].toolbar.autohide = True
+            self.freqplots[cP].title.vertical_align = 'middle'
+            self.freqplots[cP].title.align = 'left'
+            self.freqplots[cP].ygrid.grid_line_color = None
+            self.freqplots[cP].xaxis.minor_tick_line_color = None  # turn off x-axis minor ticks
+            self.freqplots[cP].yaxis.major_tick_line_color = None  # turn off y-axis minor ticks
+            self.freqplots[cP].yaxis.minor_tick_line_color = None  # turn off y-axis minor ticks
+            self.freqplots[cP].yaxis.major_label_text_font_size = "0pt"
+            self.freqplots[cP].min_border_left = 20
+        
+            self.freqlines.append(self.freqplots[cP].line(x='Frequency', y=(self.channellabels[cP] + 'freq'), source=self.source, color='black', line_width=1.5, alpha=0.7))
+        
+        # This is important! Save curdoc() to make sure all threads
+        # see the same document.
+        self.doc = curdoc()
+        
+        tmseries = column(self.plots[0],row(Scaledownbutton,Scaleupbutton,self.Filterdatabutton))
+        
+        tab1 = Panel(child=tmseries, title="Time Series")
+        
+        fseries = column(row(self.freqplots[0],self.freqplots[1],self.freqplots[2],self.freqplots[3]),row(self.freqplots[4],self.freqplots[5],self.freqplots[6],self.freqplots[7]))
+        tab2 = Panel(child=fseries, title="Frequency")
+                
+        # Put all the tabs into one application
+        tabs = Tabs(tabs = [tab1, tab2])
+        
+        self.doc.add_root(tabs)        
         
         thread = Thread(target=self.blocking_task, args=[])
         thread.start()
@@ -130,13 +181,11 @@ class UnicornBlackFunctions():
 
     def _computedataoffset(self, presource):
         
-        if (self._filterdata):
-            presource = self._computedatafilter(presource)
+        presource = self._computedatafilter(presource)
             
         for cC in range(self._numberOfAcquiredChannels):
             # baseline data to last points
             presource[self.channellabels[cC]] = numpy.ndarray.tolist(numpy.add(numpy.multiply(numpy.subtract(presource[self.channellabels[cC]], numpy.mean(presource[self.channellabels[cC]][-self._baselinerollingspan:])), float(self._datascale)), (cC + 1)*self._scale))
-            
             
         return presource
 
@@ -144,38 +193,42 @@ class UnicornBlackFunctions():
         
         # check bad channels
         for cC in range(self._numberOfAcquiredChannels):
-            self._power, self._freqs = mlab.psd(x=presource[self.channellabels[cC]], NFFT=self._scale, Fs=self._samplefreq, noverlap=int(self._rollingspanpoints/3.0), sides='onesided', scale_by_freq=True)
+            _power, _freqs = mlab.psd(x=presource[self.channellabels[cC]], NFFT=self._scale, Fs=self._samplefreq, noverlap=int(self._rollingspanpoints/3.0), sides='onesided', scale_by_freq=True)
+            self.freqdata[cC] = [0.0] * self._rollingspanpoints
+            self.freqdata[cC][0:self.freqdatalength] = _power
+            presource[self.channellabels[cC] + 'freq'] = self.freqdata[cC]
+            presource['Frequency'] = self._freqs
             
-            nonnoise = numpy.mean(self._power[numpy.argmin(abs(self._freqs-(35))):numpy.argmin(abs(self._freqs-(50)))])
-            noise = numpy.mean(self._power[numpy.argmin(abs(self._freqs-(55))):numpy.argmin(abs(self._freqs-(65)))])
+            nonnoise = numpy.mean(self.freqdata[cC][numpy.argmin(abs(self._freqs-(35))):numpy.argmin(abs(self._freqs-(50)))])
+            noise = numpy.mean(self.freqdata[cC][numpy.argmin(abs(self._freqs-(55))):numpy.argmin(abs(self._freqs-(65)))])
             if ((noise / float(nonnoise)) > 1.5):
                 self._badchannelbools[cC] = True
-                self.channeltext[cC].text_color='red'
+                try:
+                    self.channeltext[cC].text_color='red'
+                except:
+                    pass
             else:
                 self._badchannelbools[cC] = False
-                self.channeltext[cC].text_color=self.colorpalet[cC]
+                try:
+                    self.channeltext[cC].text_color=self.colorpalet[cC]
+                except:
+                    pass
         
             if (self._filterdata):
                 tempdata = scipy.signal.filtfilt(self._hpfiltersettings[0], self._hpfiltersettings[1], presource[self.channellabels[cC]], method="gust") # High pass:
                 presource[self.channellabels[cC]] = scipy.signal.filtfilt(self._lpfiltersettings[0], self._lpfiltersettings[1], tempdata, method="gust") # low pass:
-            
+           
         return presource
 
 
     def _scaleup(self):
         self._datascale = self._datascale * 2.0
-        
-        # but update the document from callback
         self.updatesamples()
-        self._badchannelbools[3] = False
         self.scaletext.text = ('Scale %.1f microvolts' % float(self._scale / float(self._datascale)))
         
     def _scaledown(self):
         self._datascale = self._datascale / 2.0
-        
-        # but update the document from callback
         self.updatesamples()
-        self._badchannelbools[3] = True
         self.scaletext.text = ('Scale %.1f microvolts' % float(self._scale / float(self._datascale)))
 
     @gen.coroutine
@@ -188,6 +241,7 @@ class UnicornBlackFunctions():
         nres = self._computedataoffset(res)
         
         self.source.data = nres
+        
         # turn channel label red if bad
         for cC in range(self._numberOfAcquiredChannels):
             if self._badchannelbools[cC]:
@@ -198,7 +252,7 @@ class UnicornBlackFunctions():
     def blocking_task(self):
         while True:
             # do some blocking computation
-            examplesamples = 20
+            examplesamples = 25
             time.sleep((0.004) * examplesamples)
             for cS in range(examplesamples):
                 newdatapoints = numpy.ndarray.tolist(numpy.multiply(numpy.random.rand(self._numberOfAcquiredChannels), 100))
