@@ -16,9 +16,8 @@ from functools import partial
 from threading import Thread
 import time
 from tornado import gen
-print(os. getcwd())
 sys.path.append(os.getcwd())
-import unicornhybridblack
+import Engine.unicornhybridblack as unicornhybridblack
 
 # features to add
 
@@ -33,7 +32,7 @@ class UnicornBlackPlottingFunctions():
         self._datascale = 1
         
         # Read in parameter file
-        inputfile = r'../' + 'StreamingDeviceID.txt'
+        inputfile = r'StreamingDeviceID.txt'
         dcontents = 0
         deveryline = []
         dcontents = open(inputfile).readlines()
@@ -64,6 +63,7 @@ class UnicornBlackPlottingFunctions():
                 temparray = deveryline[dinfo][1].split(',')
                 self._filtersettings = [float(temparray[0]), float(temparray[1])]
         
+        
         self._rollingspanpoints = int(math.floor( float(self._rollingspan) * float(self._samplefreq) ))
         self._baselinerollingspan = int(self._rollingspanpoints / 10.0)
         self.res = None
@@ -74,6 +74,15 @@ class UnicornBlackPlottingFunctions():
         self.altchannellabels = self.channellabels[:]
         self.altchannellabels.reverse()
         self.data = [[0.0] * self._numberOfAcquiredChannels] * self._rollingspanpoints
+        
+        # connect to Device
+        self.UnicornBlack = unicornhybridblack.UnicornBlackFunctions() 
+        self.UnicornBlack.connect(deviceID=self.deviceID, rollingspan=self._rollingspan)
+        
+        if self.deviceID is not None:
+                # pull real data
+                self.data = self.UnicornBlack.data
+                
         self._plottingdata = numpy.array(self.data)
         self.xtime = numpy.ndarray.tolist(numpy.linspace(0, self._rollingspan, self._rollingspanpoints))
         self.paletsize = int(self._numberOfAcquiredChannels*1.5)
@@ -96,9 +105,6 @@ class UnicornBlackPlottingFunctions():
             self._freqs.append(float(self._freqs[-1]) + float(self._freqstep))
         self._freqs = numpy.array(self._freqs)
         
-        # connect to Device
-        self.UnicornBlack = unicornhybridblack.UnicornBlackFunctions() 
-        self.UnicornBlack.connect(deviceID=self.deviceID)
         
     def stopvisualization(self):
         self.UnicornBlack.disconnect()
@@ -130,7 +136,7 @@ class UnicornBlackPlottingFunctions():
                  y_axis_location='left',
                  y_range=(0, (self._numberOfAcquiredChannels+1)*self._scale),    
                  plot_height=850,
-                 plot_width=1400,         
+                 plot_width=1800,         
                  title='',
                  title_location='above',
                  tools=""))
@@ -146,7 +152,7 @@ class UnicornBlackPlottingFunctions():
         self.plots[cC].min_border_left = 50
         
         for cL in range(self._numberOfAcquiredChannels):
-           self.lines.append(self.plots[0].line(x='Time', y=self.altchannellabels[cL], source=self.source, color=self.colorpalet[cL], line_width=1, alpha=0.9))
+           self.lines.append(self.plots[0].line(x='Time', y=self.channellabels[cL], source=self.source, color=self.colorpalet[cL], line_width=1, alpha=0.9))
            self.channeltext.append(Label(x=0, y=((cL + 1)*self._scale), x_offset=-45, x_units='data', y_units='data',text=self.altchannellabels[cL], text_font_size="20pt", text_color=self.colorpalet[cL], render_mode='css', background_fill_alpha=0.0, text_baseline="middle"))
            self.plots[cC].add_layout(self.channeltext[cL])
         
@@ -174,7 +180,7 @@ class UnicornBlackPlottingFunctions():
                              y_axis_label='',
                              y_axis_type='linear',
                              y_axis_location='left',
-                             y_range=(0, 100),    
+                             y_range=(0, 100000),    
                              plot_height=400,
                              plot_width=350,         
                              title=self.channellabels[cP],
@@ -298,12 +304,12 @@ class UnicornBlackPlottingFunctions():
             if self.deviceID is not None:
                 # pull real data
                 self.data = self.UnicornBlack.data
-            else:
-                # show fake data
-                for cS in range(samples):
-                    newdatapoints = numpy.ndarray.tolist(numpy.multiply(numpy.random.rand(self._numberOfAcquiredChannels), 100))
-                    self.data.append(newdatapoints) 
-                    self.data.pop(0)
+            #else:
+            #    # show fake data
+            #    for cS in range(samples):
+            #        newdatapoints = numpy.ndarray.tolist(numpy.multiply(numpy.random.rand(self._numberOfAcquiredChannels), 100))
+            #        self.data.append(newdatapoints) 
+            #        self.data.pop(0)
                             
             self._plottingdata = numpy.array(self.data)
         
