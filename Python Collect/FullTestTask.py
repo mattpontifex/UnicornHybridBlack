@@ -3,7 +3,7 @@ import random
 import pandas
 import time
 from psychopy import visual, core, event
-import unicornhybridblack
+import Engine.unicornhybridblack as unicornhybridblack
 
 targetsize = 1.2
 nontargetsize = 0.6
@@ -37,7 +37,8 @@ participantwin = visual.Window(size = (800,800), fullscr = False, screen = 0, al
 participantwin.flip()   
 
 # connect to Device
-UnicornBlack = unicornhybridblack.UnicornBlackFunctions(deviceID='UN-2019.05.51') 
+UnicornBlack = unicornhybridblack.UnicornBlackFunctions() 
+UnicornBlack.connect(deviceID='UN-2019.05.51')
 time.sleep(1) # give it some initialization time
 
 UnicornBlack.startrecording('oddballtest')

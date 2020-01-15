@@ -7,7 +7,7 @@ warnings.simplefilter('ignore')
 logging.console.setLevel(logging.CRITICAL)
 from datetime import datetime
 
-import UnicornPy
+import Engine.UnicornPy as UnicornPy
 
 FrameLength = 250;
 AcquisitionDurationInSeconds = 1;
