@@ -19,6 +19,8 @@ class UnicornBlackFunctions():
         # establish variables
         self.collectversion = '2020.01.09.2'
         self.device = None;
+        self.path = os.path.dirname(os.getcwd())
+        self.outputfolder = 'Raw'
         
         # create a Queue and Lock
         self._queue = Queue()
@@ -350,7 +352,7 @@ class UnicornBlackFunctions():
     def startrecording(self, logfilename='default'):
         
         self.logdata = True
-        self.logfilename = logfilename
+        self.logfilename = self.path + os.path.sep + self.outputfolder + os.path.sep + logfilename
         timetemp = str(datetime.now()).split()
         self._timetemp = timetemp[0] + 'T' + timetemp[1]
         self._logfile = open('%s.csv' % (self.logfilename), 'w')
