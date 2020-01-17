@@ -188,19 +188,25 @@ class UnicornBlackFunctions():
 		
         # keep streaming until it is signalled that we should stop
         while self._streaming:
-            # Receives the configured number of samples from the Unicorn device and writes it to the acquisition buffer.
-            self.device.GetData(self._frameLength,self._receiveBuffer,self._receiveBufferBufferLength)
-            
-            # Convert receive buffer to numpy float array 
-            sampledata = numpy.frombuffer(self._receiveBuffer, dtype=numpy.float32, count=self._numberOfAcquiredChannels * self._frameLength)
-            sampledata = numpy.reshape(sampledata, (self._frameLength, self._numberOfAcquiredChannels))
-            
-            # put the sample in the Queue
-            #self.lastsampledpoint = copy.deepcopy(sampledata[0][15])
-            self.lastsampledpoint = sampledata[0][15]
-            self._lock.acquire(True)
-            queue.put(sampledata)
-            self._lock.release()
+            boolgetdata = False
+            try:
+                # Receives the configured number of samples from the Unicorn device and writes it to the acquisition buffer.
+                self.device.GetData(self._frameLength,self._receiveBuffer,self._receiveBufferBufferLength)
+                boolgetdata = True
+            except:
+                print('\n\nMotherfucking overflow error in polling device.\n\n')                
+                
+            if boolgetdata:   
+                # Convert receive buffer to numpy float array 
+                sampledata = numpy.frombuffer(self._receiveBuffer, dtype=numpy.float32, count=self._numberOfAcquiredChannels * self._frameLength)
+                sampledata = numpy.reshape(sampledata, (self._frameLength, self._numberOfAcquiredChannels))
+                
+                # put the sample in the Queue
+                #self.lastsampledpoint = copy.deepcopy(sampledata[0][15])
+                self.lastsampledpoint = sampledata[0][15]
+                self._lock.acquire(True)
+                queue.put(sampledata)
+                self._lock.release()
             
             time.sleep(self._intsampletime)
             
