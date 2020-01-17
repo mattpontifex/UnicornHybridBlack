@@ -3,4 +3,4 @@ import unicornhybridblackplotting
 
 UnicornBlackStreamer = unicornhybridblackplotting.UnicornBlackPlottingFunctions()
 
-UnicornBlackStreamer.startvisualization()
+UnicornBlackStreamer.startvisualization('True')

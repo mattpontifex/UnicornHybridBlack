@@ -20,7 +20,7 @@ sys.path.append(os.getcwd())
 import Engine.unicornhybridblack as unicornhybridblack
 
 # features to add
-
+#raise SystemExit('No connection available.')  when run shuts down the command line window as well.
 
 class UnicornBlackPlottingFunctions():    
     """class for data visualization using the g.tec Unicorn Hybrid Black
@@ -28,6 +28,7 @@ class UnicornBlackPlottingFunctions():
     
     def __init__(self):
         
+        self._simple = False
         self._scale = 500
         self._datascale = 1
         
@@ -65,7 +66,7 @@ class UnicornBlackPlottingFunctions():
         
         
         self._rollingspanpoints = int(math.floor( float(self._rollingspan) * float(self._samplefreq) ))
-        self._baselinerollingspan = int(self._rollingspanpoints / 10.0)
+        self._baselinerollingspan = int(self._rollingspanpoints / 3.0)
         self.res = None
         self.source = None
         self._filterdata = False
@@ -74,16 +75,23 @@ class UnicornBlackPlottingFunctions():
         self.altchannellabels = self.channellabels[:]
         self.altchannellabels.reverse()
         self.data = [[0.0] * self._numberOfAcquiredChannels] * self._rollingspanpoints
+        self._plottingdata = numpy.array(self.data, copy=True)
         
         # connect to Device
-        self.UnicornBlack = unicornhybridblack.UnicornBlackFunctions() 
-        self.UnicornBlack.connect(deviceID=self.deviceID, rollingspan=self._rollingspan)
+        try:
+            self.UnicornBlack = unicornhybridblack.UnicornBlackFunctions() 
+            self.UnicornBlack.connect(deviceID=self.deviceID, rollingspan=self._rollingspan)
+        except:
+            print('\n\n\n--------------------\n\n\n')
+            raise Exception('Error: Unable to connect to the Unicorn Hybrid Black.')
+            print('\n\n\n--------------------\n\n\n')
+            pass
         
         if self.deviceID is not None:
                 # pull real data
                 self.data = self.UnicornBlack.data
+                self._plottingdata = numpy.array(self.data, copy=True)
                 
-        self._plottingdata = numpy.array(self.data)
         self.xtime = numpy.ndarray.tolist(numpy.linspace(0, self._rollingspan, self._rollingspanpoints))
         self.paletsize = int(self._numberOfAcquiredChannels*1.5)
         self.colorpalet = viridis(self.paletsize)
@@ -109,7 +117,9 @@ class UnicornBlackPlottingFunctions():
     def stopvisualization(self):
         self.UnicornBlack.disconnect()
         
-    def startvisualization(self):
+    def startvisualization(self, simple=False):
+        
+        self._simple = simple
         
         # add data to source
         res = {self.channellabels[i]: self._plottingdata[:,i] for i in range(self._numberOfAcquiredChannels)} 
@@ -168,51 +178,56 @@ class UnicornBlackPlottingFunctions():
         self.Filterdatabutton = Toggle(label="Turn on Data Filter")
         self.Filterdatabutton.on_click(self.filtertoggle_handler)
         
-        # frequency plots
-        self.freqplots = []
-        self.freqlines = []
-        for cP in range(self._numberOfAcquiredChannels):
-            self.freqplots.append(figure(
-                             x_axis_label='Frequency',
-                             x_axis_type='linear',
-                             x_axis_location='below',
-                             x_range=(0, 125),         
-                             y_axis_label='',
-                             y_axis_type='linear',
-                             y_axis_location='left',
-                             y_range=(0, 100000),    
-                             plot_height=400,
-                             plot_width=350,         
-                             title=self.channellabels[cP],
-                             title_location='above',
-                             tools=""))
-            self.freqplots[cP].toolbar.autohide = True
-            self.freqplots[cP].title.vertical_align = 'middle'
-            self.freqplots[cP].title.align = 'left'
-            self.freqplots[cP].ygrid.grid_line_color = None
-            self.freqplots[cP].xaxis.minor_tick_line_color = None  # turn off x-axis minor ticks
-            self.freqplots[cP].yaxis.major_tick_line_color = None  # turn off y-axis minor ticks
-            self.freqplots[cP].yaxis.minor_tick_line_color = None  # turn off y-axis minor ticks
-            self.freqplots[cP].yaxis.major_label_text_font_size = "0pt"
-            self.freqplots[cP].min_border_left = 20
-        
-            self.freqlines.append(self.freqplots[cP].line(x='Frequency', y=(self.channellabels[cP] + 'freq'), source=self.source, color='black', line_width=1.5, alpha=0.7))
-        
+        if self._simple:
+            # frequency plots
+            self.freqplots = []
+            self.freqlines = []
+            for cP in range(self._numberOfAcquiredChannels):
+                self.freqplots.append(figure(
+                                 x_axis_label='Frequency',
+                                 x_axis_type='linear',
+                                 x_axis_location='below',
+                                 x_range=(0, 70),         
+                                 y_axis_label='',
+                                 y_axis_type='linear',
+                                 y_axis_location='left',
+                                 y_range=(0, 100000),    
+                                 plot_height=400,
+                                 plot_width=350,         
+                                 title=self.channellabels[cP],
+                                 title_location='above',
+                                 tools=""))
+                self.freqplots[cP].toolbar.autohide = True
+                self.freqplots[cP].title.vertical_align = 'middle'
+                self.freqplots[cP].title.align = 'left'
+                self.freqplots[cP].ygrid.grid_line_color = None
+                self.freqplots[cP].xaxis.minor_tick_line_color = None  # turn off x-axis minor ticks
+                self.freqplots[cP].yaxis.major_tick_line_color = None  # turn off y-axis minor ticks
+                self.freqplots[cP].yaxis.minor_tick_line_color = None  # turn off y-axis minor ticks
+                self.freqplots[cP].yaxis.major_label_text_font_size = "0pt"
+                self.freqplots[cP].min_border_left = 20
+            
+                self.freqlines.append(self.freqplots[cP].line(x='Frequency', y=(self.channellabels[cP] + 'freq'), source=self.source, color='black', line_width=1.5, alpha=0.7))
+            
         # This is important! Save curdoc() to make sure all threads
         # see the same document.
         self.doc = curdoc()
         
         tmseries = column(self.plots[0],row(Scaledownbutton,Scaleupbutton,self.Filterdatabutton))
         
-        tab1 = Panel(child=tmseries, title="Time Series")
-        
-        fseries = column(row(self.freqplots[0],self.freqplots[1],self.freqplots[2],self.freqplots[3]),row(self.freqplots[4],self.freqplots[5],self.freqplots[6],self.freqplots[7]))
-        tab2 = Panel(child=fseries, title="Frequency")
-                
-        # Put all the tabs into one application
-        tabs = Tabs(tabs = [tab1, tab2])
-        
-        self.doc.add_root(tabs)        
+        if self._simple:
+            
+            tab1 = Panel(child=tmseries, title="Time Series")
+            
+            fseries = column(row(self.freqplots[0],self.freqplots[1],self.freqplots[2],self.freqplots[3]),row(self.freqplots[4],self.freqplots[5],self.freqplots[6],self.freqplots[7]))
+            tab2 = Panel(child=fseries, title="Frequency")
+                    
+            # Put all the tabs into one application
+            tabs = Tabs(tabs = [tab1, tab2])
+            
+            self.doc.add_root(tabs)
+        else:
+            self.doc.add_root(tmseries)
         
         thread = Thread(target=self.blocking_task, args=[])
         thread.start()
@@ -238,35 +253,43 @@ class UnicornBlackPlottingFunctions():
     def _computedatafilter(self, presource):
         
         # check bad channels
-        for cC in range(self._numberOfAcquiredChannels):
-            _power, _freqs = mlab.psd(x=presource[self.channellabels[cC]], NFFT=self._scale, Fs=self._samplefreq, noverlap=int(self._rollingspanpoints/3.0), sides='onesided', scale_by_freq=True)
-            self.freqdata[cC] = [0.0] * self._rollingspanpoints
-            self.freqdata[cC][0:self.freqdatalength] = _power
-            presource[self.channellabels[cC] + 'freq'] = self.freqdata[cC]
-            presource['Frequency'] = self._freqs
+        self._internalcounter = 0
+        if (self._simple) or (self._internalcounter > 5):
+            for cC in range(self._numberOfAcquiredChannels):
+                _power, _freqs = mlab.psd(x=presource[self.channellabels[cC]], NFFT=self._scale, Fs=self._samplefreq, noverlap=int(math.floor(self._rollingspanpoints/3.0)), sides='onesided', scale_by_freq=True, detrend='linear')
+                self.freqdata[cC] = [0.0] * self._rollingspanpoints
+                self.freqdata[cC][0:self.freqdatalength] = _power
+                presource[self.channellabels[cC] + 'freq'] = self.freqdata[cC]
+                presource['Frequency'] = self._freqs
+                
+                nonnoise = numpy.mean(self.freqdata[cC][numpy.argmin(abs(self._freqs-(35))):numpy.argmin(abs(self._freqs-(50)))])
+                noise = numpy.mean(self.freqdata[cC][numpy.argmin(abs(self._freqs-(55))):numpy.argmin(abs(self._freqs-(65)))])
+                if (float(nonnoise) > 0.0):
+                    if ((noise / float(nonnoise)) > 1.5):
+                        self._badchannelbools[cC] = True
+                        try:
+                            self.channeltext[cC].text_color='red'
+                        except:
+                            pass
+                    else:
+                        self._badchannelbools[cC] = False
+                        try:
+                            self.channeltext[cC].text_color=self.colorpalet[cC]
+                        except:
+                            pass
             
-            nonnoise = numpy.mean(self.freqdata[cC][numpy.argmin(abs(self._freqs-(35))):numpy.argmin(abs(self._freqs-(50)))])
-            noise = numpy.mean(self.freqdata[cC][numpy.argmin(abs(self._freqs-(55))):numpy.argmin(abs(self._freqs-(65)))])
-            if (float(nonnoise) > 0.0):
-                if ((noise / float(nonnoise)) > 1.5):
-                    self._badchannelbools[cC] = True
-                    try:
-                        self.channeltext[cC].text_color='red'
-                    except:
-                        pass
-                else:
-                    self._badchannelbools[cC] = False
-                    try:
-                        self.channeltext[cC].text_color=self.colorpalet[cC]
-                    except:
-                        pass
+             
+            self._internalcounter = -1
+            
+        self._internalcounter = self._internalcounter + 1
         
-            if (self._filterdata):
-                tempdata = scipy.signal.filtfilt(self._hpfiltersettings[0], self._hpfiltersettings[1], presource[self.channellabels[cC]], method="gust") # High pass:
-                presource[self.channellabels[cC]] = scipy.signal.filtfilt(self._lpfiltersettings[0], self._lpfiltersettings[1], tempdata, method="gust") # low pass:
-           
+        # filter data
+        if (self._filterdata):
+            for cC in range(self._numberOfAcquiredChannels):
+                tempdata = scipy.signal.filtfilt(b=self._hpfiltersettings[0], a=self._hpfiltersettings[1], x=presource[self.channellabels[cC]], padtype='constant', padlen=int(math.floor(self._rollingspanpoints/3.0)), method="pad") # High pass:
+                presource[self.channellabels[cC]] = scipy.signal.filtfilt(b=self._lpfiltersettings[0], a=self._lpfiltersettings[1], x=tempdata, padtype='constant', padlen=int(math.floor(self._rollingspanpoints/3.0)), method="pad") # low pass:
+                
         return presource
-
 
     def _scaleup(self):
         self._datascale = self._datascale * 2.0
@@ -311,7 +334,7 @@ class UnicornBlackPlottingFunctions():
             #        self.data.append(newdatapoints) 
             #        self.data.pop(0)
                             
-            self._plottingdata = numpy.array(self.data)
+            self._plottingdata = numpy.array(self.data, copy=True)
         
             # but update the document from callback
             self.doc.add_next_tick_callback(partial(self.updatesamples))
