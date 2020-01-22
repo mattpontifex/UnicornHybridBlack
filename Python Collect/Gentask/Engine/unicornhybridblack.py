@@ -27,6 +27,8 @@ class UnicornBlackFunctions():
         self._logsamplequeue = Queue()
         self._logeventqueue = Queue()
         self._lock = Lock()
+        self._datalock = Lock()
+        self._bufferlock = Lock()
         self._loglock = Lock()
         self._logeventlock = Lock()
         
@@ -42,7 +44,7 @@ class UnicornBlackFunctions():
         self._numberOfAcquiredChannels = None
         self._frameLength = 1
         self._samplefreq = 250.0
-        self._intsampletime = 1.0 / self._samplefreq
+        self._intsampletime = 1.0 / self._samplefreq / 2
         self.channellabels = 'FZ, C3, CZ, C4, PZ, O1, OZ, O2, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
         
         # activate
@@ -189,16 +191,22 @@ class UnicornBlackFunctions():
         # keep streaming until it is signalled that we should stop
         while self._streaming:
             boolgetdata = False
+            self._bufferlock.acquire(True)
             try:
                 # Receives the configured number of samples from the Unicorn device and writes it to the acquisition buffer.
                 self.device.GetData(self._frameLength,self._receiveBuffer,self._receiveBufferBufferLength)
                 boolgetdata = True
             except:
-                print('\n\nMotherfucking overflow error in polling device.\n\n')                
+                self._receiveBufferBufferLength = self._frameLength * self._numberOfAcquiredChannels * 4
+                self._receiveBuffer = bytearray(self._receiveBufferBufferLength)
+                print('\n\nMotherfucking overflow error in polling device.\n\n') 
+            self._bufferlock.release()
                 
             if boolgetdata:   
                 # Convert receive buffer to numpy float array 
+                self._bufferlock.acquire(True)
                 sampledata = numpy.frombuffer(self._receiveBuffer, dtype=numpy.float32, count=self._numberOfAcquiredChannels * self._frameLength)
+                self._bufferlock.release()
                 sampledata = numpy.reshape(sampledata, (self._frameLength, self._numberOfAcquiredChannels))
                 
                 # put the sample in the Queue
@@ -239,13 +247,17 @@ class UnicornBlackFunctions():
                     break
                 else:
                     # check if the new sample is the same as the current sample
+                    
                     if not self.data[-1][15] == sampledata[0][15]:
                         # update current sample
+                        self._datalock.acquire(True)
                         self.data.append(sampledata[0]) 
                         self.data.pop(0)
+                        self._datalock.release()
                         self._loglock.acquire(True)
                         logqueue.put(sampledata)
                         self._loglock.release()
+                    
 
         self._loglock.acquire(True)
         logqueue.put(None) # poison pill approach
