@@ -31,6 +31,7 @@ class UnicornBlackPlottingFunctions():
         self._simple = False
         self._scale = 500
         self._datascale = 1
+        self._datafreqscale = 1
         
         # Read in parameter file
         inputfile = r'StreamingDeviceID.txt'
@@ -193,7 +194,7 @@ class UnicornBlackPlottingFunctions():
                                  y_axis_location='left',
                                  y_range=(0, 100000),    
                                  plot_height=400,
-                                 plot_width=350,         
+                                 plot_width=400,         
                                  title=self.channellabels[cP],
                                  title_location='above',
                                  tools=""))
@@ -209,6 +210,13 @@ class UnicornBlackPlottingFunctions():
             
                 self.freqlines.append(self.freqplots[cP].line(x='Frequency', y=(self.channellabels[cP] + 'freq'), source=self.source, color='black', line_width=1.5, alpha=0.7))
             
+                
+            Scaleupfreqbutton = Button(label="Scaleup")
+            Scaleupfreqbutton.on_click(self._scalefrequp)
+            Scaledownfreqbutton = Button(label="Scaledown")
+            Scaledownfreqbutton.on_click(self._scalefreqdown)
+            
+            
         # This is important! Save curdoc() to make sure all threads
         # see the same document.
         self.doc = curdoc()
@@ -219,7 +227,7 @@ class UnicornBlackPlottingFunctions():
             
             tab1 = Panel(child=tmseries, title="Time Series")
             
-            fseries = column(row(self.freqplots[0],self.freqplots[1],self.freqplots[2],self.freqplots[3]),row(self.freqplots[4],self.freqplots[5],self.freqplots[6],self.freqplots[7]))
+            fseries = column(row(self.freqplots[0],self.freqplots[1],self.freqplots[2],self.freqplots[3]),row(self.freqplots[4],self.freqplots[5],self.freqplots[6],self.freqplots[7]),row(Scaledownfreqbutton,Scaleupfreqbutton))
             tab2 = Panel(child=fseries, title="Frequency")
                     
             # Put all the tabs into one application
@@ -259,7 +267,7 @@ class UnicornBlackPlottingFunctions():
                 _power, _freqs = mlab.psd(x=presource[self.channellabels[cC]], NFFT=self._scale, Fs=self._samplefreq, noverlap=int(math.floor(self._rollingspanpoints/3.0)), sides='onesided', scale_by_freq=True, detrend='linear')
                 self.freqdata[cC] = [0.0] * self._rollingspanpoints
                 self.freqdata[cC][0:self.freqdatalength] = _power
-                presource[self.channellabels[cC] + 'freq'] = self.freqdata[cC]
+                presource[self.channellabels[cC] + 'freq'] = numpy.multiply(self.freqdata[cC], float(self._datafreqscale))
                 presource['Frequency'] = self._freqs
                 
                 nonnoise = numpy.mean(self.freqdata[cC][numpy.argmin(abs(self._freqs-(35))):numpy.argmin(abs(self._freqs-(50)))])
@@ -291,6 +299,14 @@ class UnicornBlackPlottingFunctions():
                 
         return presource
 
+    def _scalefrequp(self):
+        self._datafreqscale = self._datafreqscale * 2.0
+        self.updatesamples()
+        
+    def _scalefreqdown(self):
+        self._datafreqscale = self._datafreqscale / 2.0
+        self.updatesamples()
+        
     def _scaleup(self):
         self._datascale = self._datascale * 2.0
         self.updatesamples()
