@@ -146,8 +146,8 @@ class UnicornBlackPlottingFunctions():
                  y_axis_type='linear',
                  y_axis_location='left',
                  y_range=(0, (self._numberOfAcquiredChannels+1)*self._scale),    
-                 plot_height=850,
-                 plot_width=1800,         
+                 plot_height=780,
+                 plot_width=1450,         
                  title='',
                  title_location='above',
                  tools=""))
@@ -194,7 +194,7 @@ class UnicornBlackPlottingFunctions():
                                  y_axis_location='left',
                                  y_range=(0, 100000),    
                                  plot_height=400,
-                                 plot_width=400,         
+                                 plot_width=370,         
                                  title=self.channellabels[cP],
                                  title_location='above',
                                  tools=""))
@@ -338,7 +338,7 @@ class UnicornBlackPlottingFunctions():
     def blocking_task(self):
         while True:
             
-            samples = 25
+            samples = 15
             time.sleep((0.004) * samples) # do some blocking computation
             if self.deviceID is not None:
                 # pull real data
