@@ -75,6 +75,7 @@ while continueExperiment:
     targetstimuli.setAutoDraw(True)
     
     elapsedTime.reset()
+    UnicornBlack._safetolog = False;
     participantwin.flip(); 
     UnicornBlack.mark_event(eventcodes[trial]) # Send trigger 
               
@@ -110,6 +111,7 @@ while continueExperiment:
         if turnstimoff:
             targetstimuli.setAutoDraw(False)
             stimulusisbeingdisplayed = False
+            UnicornBlack._safetolog = True;
             participantwin.flip()
 
 # stop recording
