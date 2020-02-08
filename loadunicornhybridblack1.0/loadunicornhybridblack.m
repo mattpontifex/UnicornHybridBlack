@@ -106,14 +106,16 @@ function [EEG, command] = loadunicornhybridblack(fullfilename, varargin)
         fclose(fileID);
         
         % make sure all the points are at the correct times
-        samplingpoints = [datain(1,end):1:datain(end,end)];
+        samplingpoints = [datain(2,end):1:datain(end-1,end)];
         EEG.times = samplingpoints * (1/samplerate); % change samples to time
         EEG.pnts = size(EEG.times,2);
         EEG.data = NaN(EEG.nbchan, EEG.pnts);
         for indxi = 1:size(datain,1)
             currentsample = datain(indxi,end);
-            [~, eventtime] = min(abs(samplingpoints - (currentsample)));
-            EEG.data(:,eventtime) = datain(indxi,1:end-1)';
+            if (currentsample > 0)
+                [~, eventtime] = min(abs(samplingpoints - (currentsample)));
+                EEG.data(:,eventtime) = datain(indxi,1:end-1)';
+            end
         end
         datacheck = sum(isnan(EEG.data(1,:)));
         if (datacheck > 2)
