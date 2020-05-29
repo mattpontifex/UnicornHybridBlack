@@ -7,7 +7,12 @@ import time
 from datetime import datetime
 from threading import Thread, Lock
 from multiprocessing import Queue
-import Engine.UnicornPy as UnicornPy
+
+# DEBUG #
+if __name__ == "__main__":
+    import UnicornPy as UnicornPy
+else:
+    import Engine.UnicornPy as UnicornPy
 
 
 class UnicornBlackFunctions():    
@@ -17,13 +22,14 @@ class UnicornBlackFunctions():
     def __init__(self):
 
         # establish variables
-        self.collectversion = '2020.01.09.2'
+        self.collectversion = '2020.05.27.2'
         self.device = None;
         self.path = os.path.dirname(os.getcwd())
         self.outputfolder = 'Raw'
         
         # create a Queue and Lock
         self._queue = Queue()
+        self._queuelock = Lock()
         self._logsamplequeue = Queue()
         self._logeventqueue = Queue()
         self._lock = Lock()
@@ -44,7 +50,7 @@ class UnicornBlackFunctions():
         self._numberOfAcquiredChannels = None
         self._frameLength = 1
         self._samplefreq = 250.0
-        self._intsampletime = 1.0 / self._samplefreq / 2
+        self._intsampletime = 1.0 / self._samplefreq / 10
         self.channellabels = 'FZ, C3, CZ, C4, PZ, O1, OZ, O2, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
         
         # activate
@@ -53,7 +59,7 @@ class UnicornBlackFunctions():
         self.data = None
         
     
-    def connect(self, deviceID=None, rollingspan=15):
+    def connect(self, deviceID=None, rollingspan=15.0):
         
         self.deviceID = deviceID;
         # make sure everything is disconnected
@@ -112,20 +118,11 @@ class UnicornBlackFunctions():
         try:
             # initialize sample streamer
             self._streaming = True
-            self._ssthread = Thread(target=self._stream_samples, args=[self._queue], daemon=True)
+            self._ssthread = Thread(target=self._stream_samples, args=[self._logsamplequeue], daemon=True)
             self._ssthread.name = 'samplestreamer'
         except:
             print("Error initializing sample streamer.")
         
-        try:
-            # initialize data processer
-            self._processing = True
-            self._dpthread = Thread(target=self._process_samples, args=[self._queue, self._logsamplequeue], daemon=True)
-            self._dpthread.name = 'dataprocessor'
-            
-        except:
-            print("Error initializing data processer.")
-            
             
         try:
             # initialize data recorder
@@ -149,23 +146,23 @@ class UnicornBlackFunctions():
             
         try:
             # start processes
-            self.device.StartAcquisition(False)
+            self.device.StartAcquisition(False)  # True - test signal; False - measurement mode
         except:
             print("Error starting acquisition.")
             
         self.logdata = False
         self._ssthread.start()
-        self._dpthread.start()
         self._drthread.start()
         self._erthread.start()
         print("Connection Complete")
         
     def disconnect(self):
        
+        time.sleep((self._intsampletime * float(10)))
+        
         #self.stoprecording()       
         self._streaming = False
         self._ssthread.join()
-        self._dpthread.join()
         self._drthread.join()
         self._erthread.join()
 	
@@ -174,6 +171,11 @@ class UnicornBlackFunctions():
         except:
             pass
                 
+        try:
+            self._logfile.close()
+        except:
+            pass
+        
         del self.device
         self.device = None
         print("Disconnection Complete")
@@ -193,75 +195,41 @@ class UnicornBlackFunctions():
             boolgetdata = False
             self._bufferlock.acquire(True)
             try:
+                #sampledata = [numpy.ndarray.tolist(numpy.multiply(numpy.random.rand(int(self._numberOfAcquiredChannels)), 100))]
                 # Receives the configured number of samples from the Unicorn device and writes it to the acquisition buffer.
                 self.device.GetData(self._frameLength,self._receiveBuffer,self._receiveBufferBufferLength)
+                # Convert receive buffer to numpy float array 
+                sampledata = numpy.frombuffer(self._receiveBuffer, dtype=numpy.float32, count=self._numberOfAcquiredChannels * self._frameLength)
+                sampledata = numpy.reshape(sampledata, (self._frameLength, self._numberOfAcquiredChannels))
                 boolgetdata = True
             except:
                 self._receiveBufferBufferLength = self._frameLength * self._numberOfAcquiredChannels * 4
                 self._receiveBuffer = bytearray(self._receiveBufferBufferLength)
                 print('\n\nMotherfucking overflow error in polling device.\n\n') 
             self._bufferlock.release()
-                
+            
+            
             if boolgetdata:   
-                # Convert receive buffer to numpy float array 
-                self._bufferlock.acquire(True)
-                sampledata = numpy.frombuffer(self._receiveBuffer, dtype=numpy.float32, count=self._numberOfAcquiredChannels * self._frameLength)
-                self._bufferlock.release()
-                sampledata = numpy.reshape(sampledata, (self._frameLength, self._numberOfAcquiredChannels))
+                self._queuelock.acquire(True)
+                if not (str(int(float(self.data[-1][15]))) == str(int(float(sampledata[0][15])))): # protect against sampling the same point twice    
+                    #self.lastsampledpoint = copy.deepcopy(sampledata[0][15])
+                    self._logeventlock.acquire(True)
+                    self.lastsampledpoint = str(int(float(sampledata[0][15])))
+                    self._logeventlock.release()
+                    queue.put(sampledata)
+                    self.data.append(sampledata[0]) 
+                    self.data.pop(0)
+                self._queuelock.release()
                 
-                # put the sample in the Queue
-                #self.lastsampledpoint = copy.deepcopy(sampledata[0][15])
-                self.lastsampledpoint = sampledata[0][15]
-                self._lock.acquire(True)
-                queue.put(sampledata)
-                self._lock.release()
-            
-            time.sleep(self._intsampletime)
-            
-        self._lock.acquire(True)
+                self._bufferlock.acquire(True)
+                self._receiveBuffer = bytearray(self._receiveBufferBufferLength) # make sure everything is cleared
+                self._bufferlock.release()
+        
+        self._queuelock.acquire(True)
         queue.put(None) # poison pill approach
-        self._lock.release()
+        self._queuelock.release()
         self._eventrecording = False
         
-    def _process_samples(self, queue, logqueue):
-        """Continuously processes samples
-				
-		queue		--	a multithreading.Queue instance, to read samples
-						from
-		logqueue	--	a multithreading.Queue instance, to write samples
-						to
-		"""
-		
-        # keep processing until it is signalled that we should stop
-        while self._processing:    
-            # read new item from the queue
-            while not queue.empty():
-                self._lock.acquire(True)
-                sampledata = queue.get()
-                self._lock.release()
-                
-                if sampledata is None:
-                    # Poison pill means shutdown
-                    self._processing = False
-                    break
-                    break
-                else:
-                    # check if the new sample is the same as the current sample
-                    
-                    if not self.data[-1][15] == sampledata[0][15]:
-                        # update current sample
-                        self._datalock.acquire(True)
-                        self.data.append(sampledata[0]) 
-                        self.data.pop(0)
-                        self._datalock.release()
-                        self._loglock.acquire(True)
-                        logqueue.put(sampledata)
-                        self._loglock.release()
-                    
-
-        self._loglock.acquire(True)
-        logqueue.put(None) # poison pill approach
-        self._loglock.release()
 
     def _log_sample(self, logqueue):
         """Continuously log samples
@@ -377,6 +345,11 @@ class UnicornBlackFunctions():
         self._safetolog = True
         self._log_header()
         
+        # ensure we are getting data
+        nc = 0
+        while (str(int(float(self.data[-1][15]))) == str(int(float(0.0)))):
+            nc = nc + 1
+        
         print("Starting Recording")
 	
                         
@@ -404,7 +377,7 @@ class UnicornBlackFunctions():
         """
         if self.lastsampledpoint is not None:
             self._logeventlock.acquire(True)
-            self._logeventqueue.put(numpy.array([str(int(self.lastsampledpoint)), str(event)]))
+            self._logeventqueue.put(numpy.array([str(self.lastsampledpoint), str(event)]))
             self._logeventlock.release()
         
 
@@ -421,14 +394,16 @@ if __name__ == "__main__":
     
     UnicornBlack = UnicornBlackFunctions()   
     
-    UnicornBlack.connect(deviceID='UN-2019.05.51')
+    UnicornBlack.connect(deviceID='UN-2019.05.51', rollingspan=10)
     
     UnicornBlack.startrecording('recordeddata')
     
-    for incrX in range(10):
+    for incrX in range(60):
         time.sleep(1)
+        UnicornBlack._safetolog = False
         UnicornBlack.mark_event(incrX)
         print("Time Lapsed: %d second" % (incrX+1))
+        UnicornBlack._safetolog = True
         
     UnicornBlack.disconnect()
     
@@ -436,26 +411,63 @@ if __name__ == "__main__":
     
     # Plotting function to check for dropped samples
     import matplotlib.pyplot as plt 
-    sampleddata = UnicornBlack.data
+    #sampleddata = UnicornBlack.data
     
-    selectsampleddata = []
-    for incrX in range(len(sampleddata)):
-        if not (sampleddata[incrX][0] == float(0)):
-            selectsampleddata.append(sampleddata[incrX])
-    sampleddata = numpy.array(selectsampleddata)
-    del selectsampleddata
+    #selectsampleddata = []
+    #for incrX in range(len(sampleddata)):
+    #    if not (sampleddata[incrX][0] == float(0)):
+    #        selectsampleddata.append(sampleddata[incrX])
+    #sampleddata = numpy.array(selectsampleddata)
+    #del selectsampleddata
     
-    if (sampleddata.shape[0]) > 2:
-        x = numpy.arange(sampleddata[0][15],sampleddata[-1][15],1) 
-        y = numpy.array([0] * len(x))
-        for incrX in range(len(sampleddata)):
-            index_min = numpy.argmin(abs(x-(sampleddata[incrX][15])))
-            y[index_min] = sampleddata[incrX][15]
-        del index_min, incrX
-        x = x * (1/ 250.0)
-        plt.plot(x,y)
-        print('The recording had a total of %d dropped samples (%0.1f%%).' %(len(y)-numpy.count_nonzero(y), ((len(y)-numpy.count_nonzero(y))/len(y))*100))
-
+    #if (sampleddata.shape[0]) > 2:
+    #    x = numpy.arange(sampleddata[0][15],sampleddata[-1][15],1) 
+    #    y = numpy.array([0] * len(x))
+    #    for incrX in range(len(sampleddata)):
+    #        index_min = numpy.argmin(abs(x-(sampleddata[incrX][15])))
+    #        #y[index_min] = sampleddata[incrX][15]
+    #        y[index_min] = 1
+    #    del index_min, incrX
+    #    x = x * (1/ 250.0)
+    #    plt.plot(x,y)
+    #    print('The streamer had a total of %d dropped samples (%0.1f%%).' %(len(y)-numpy.count_nonzero(y), ((len(y)-numpy.count_nonzero(y))/len(y))*100))
+        
+    # show saved data
+    lis = []
+    with open("C:\\Studies\\Python Collect\\Gentask\\Raw\\recordeddata.csv", "rb") as f: 
+        for cnt, line in enumerate(f):
+            lis.append(line.decode("utf-8").split(','))
+    f.close()
+    del cnt, line
+    lis = lis[7:-1]
+    x2 = numpy.arange(int(float(lis[0][15])),int(float(lis[-1][15])),1) 
+    y2 = numpy.array([0] * len(x2))
+    for incrX in range(len(lis)):
+        index_min = numpy.argmin(abs(x2-(int(float(lis[incrX][15])))))
+        y2[index_min] = 1
+    del index_min, incrX
+    
+    
+    # read in event markers
+    eventlis = []
+    with open("C:\\Studies\\Python Collect\\Gentask\\Raw\\recordeddata.csve", "rb") as f: 
+        for cnt, line in enumerate(f):
+            eventlis.append(line.decode("utf-8").split(','))
+    f.close()
+    del cnt, line
+    eventlis = eventlis[4:-1]
+    
+    y3 = numpy.array([0] * len(x2))
+    for incrX in range(len(eventlis)):
+        index_min = numpy.argmin(abs(x2-(int(float(eventlis[incrX][0])))))
+        y3[index_min] = 2
+    del index_min, incrX
+    
+    x2 = x2 * (1/ 250.0)
+    plt.plot(x2,y2)
+    plt.plot(x2,y3)
+    print('The recording had a total of %d dropped samples (%0.1f%%).' %(len(y2)-numpy.count_nonzero(y2), ((len(y2)-numpy.count_nonzero(y2))/len(y2))*100))
+    
     
     # core.wait was responsible for the dropped samples!
     
