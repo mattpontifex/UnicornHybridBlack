@@ -29,7 +29,7 @@ class UnicornBlackPlottingFunctions():
     def __init__(self):
         
         self._simple = False
-        self._scale = 500
+        self._scale = 2000
         self._datascale = 1
         self._datafreqscale = 1
         
@@ -47,7 +47,7 @@ class UnicornBlackPlottingFunctions():
         # set parameters
         self.deviceID = None
         self.channellabels = ['FZ', 'C3', 'CZ', 'C4', 'PZ', 'O1', 'OZ', 'O2']
-        self._rollingspan = 5
+        self._rollingspan = 10
         self._samplefreq = 250.0
         self._filtersettings = [0.5, 30]
         for dinfo in range(0, len(dcontents)):
@@ -70,7 +70,7 @@ class UnicornBlackPlottingFunctions():
         self._baselinerollingspan = int(self._rollingspanpoints / 3.0)
         self.res = None
         self.source = None
-        self._filterdata = False
+        self._filterdata = True
         self.freqdata = []
         self._numberOfAcquiredChannels = len(self.channellabels)
         self.altchannellabels = self.channellabels[:]
@@ -80,7 +80,7 @@ class UnicornBlackPlottingFunctions():
         
         # connect to Device
         try:
-            self.UnicornBlack = unicornhybridblack.UnicornBlackFunctions() 
+            self.UnicornBlack = unicornhybridblack.UnicornBlackProcess() 
             self.UnicornBlack.connect(deviceID=self.deviceID, rollingspan=self._rollingspan)
         except:
             print('\n\n\n--------------------\n\n\n')
@@ -90,8 +90,8 @@ class UnicornBlackPlottingFunctions():
         
         if self.deviceID is not None:
                 # pull real data
-                self.data = self.UnicornBlack.data
-                self._plottingdata = numpy.array(self.data, copy=True)
+                self._plottingdata = numpy.array(self.UnicornBlack.sample_data(), copy=True)
+                self._plottingdata[:,0:8] = numpy.fliplr(self._plottingdata[:,0:8])
                 
         self.xtime = numpy.ndarray.tolist(numpy.linspace(0, self._rollingspan, self._rollingspanpoints))
         self.paletsize = int(self._numberOfAcquiredChannels*1.5)
@@ -101,6 +101,9 @@ class UnicornBlackPlottingFunctions():
         blp, alp = scipy.signal.butter(2, (self._filtersettings[1] / (self._samplefreq / 2)))
         self._hpfiltersettings = [bhp, ahp]
         self._lpfiltersettings = [blp, alp]
+        b, a = scipy.signal.iirnotch(60.0, 30.0, self._samplefreq) # Design notch filter
+        self._notchfiltersettings = [b, a]
+        
         self._badchannelbools = [False] * self._numberOfAcquiredChannels
         self.freqdatalength = 0
         for cP in range(self._numberOfAcquiredChannels):
@@ -254,7 +257,11 @@ class UnicornBlackPlottingFunctions():
             
         for cC in range(self._numberOfAcquiredChannels):
             # baseline data to last points
-            presource[self.channellabels[cC]] = numpy.ndarray.tolist(numpy.add(numpy.multiply(numpy.subtract(presource[self.channellabels[cC]], numpy.mean(presource[self.channellabels[cC]][-self._baselinerollingspan:])), float(self._datascale)), (cC + 1)*self._scale))
+            channelbaseline = numpy.mean(presource[self.channellabels[cC]][-self._baselinerollingspan:])
+            baselineddata = numpy.subtract(presource[self.channellabels[cC]], channelbaseline)
+            
+            scaleddata = numpy.multiply(baselineddata, float(self._datascale))
+            presource[self.channellabels[cC]] = numpy.ndarray.tolist(numpy.add(scaleddata, (cC + 1)*self._scale))
             
         return presource
 
@@ -294,9 +301,19 @@ class UnicornBlackPlottingFunctions():
         # filter data
         if (self._filterdata):
             for cC in range(self._numberOfAcquiredChannels):
-                tempdata = scipy.signal.filtfilt(b=self._hpfiltersettings[0], a=self._hpfiltersettings[1], x=presource[self.channellabels[cC]], padtype='constant', padlen=int(math.floor(self._rollingspanpoints/3.0)), method="pad") # High pass:
-                presource[self.channellabels[cC]] = scipy.signal.filtfilt(b=self._lpfiltersettings[0], a=self._lpfiltersettings[1], x=tempdata, padtype='constant', padlen=int(math.floor(self._rollingspanpoints/3.0)), method="pad") # low pass:
+                origtempdata = presource[self.channellabels[cC]]
+                growlength = math.floor(numpy.multiply(self._rollingspanpoints,0.9))
                 
+                beginseg = origtempdata[0:growlength]
+                endseg = origtempdata[-growlength:-1]
+                tempdata = numpy.append(numpy.append(beginseg[::-1],origtempdata),endseg[::-1])
+                
+                tempdata = scipy.signal.filtfilt(b=self._notchfiltersettings[0], a=self._notchfiltersettings[1], x=tempdata, padtype='constant', padlen=int(math.floor(len(tempdata)/3.0)), method="pad") # notch                
+                tempdata = scipy.signal.filtfilt(b=self._hpfiltersettings[0], a=self._hpfiltersettings[1], x=tempdata, padtype='constant', padlen=int(math.floor(self._rollingspanpoints/3.0)), method="pad") # High pass:
+                tempdata = scipy.signal.filtfilt(b=self._lpfiltersettings[0], a=self._lpfiltersettings[1], x=tempdata, padtype='constant', padlen=int(math.floor(self._rollingspanpoints/3.0)), method="pad") # low pass:
+                
+                tempdata = tempdata[(growlength):-(growlength-1)]
+                presource[self.channellabels[cC]] = tempdata
         return presource
 
     def _scalefrequp(self):
@@ -338,19 +355,18 @@ class UnicornBlackPlottingFunctions():
     def blocking_task(self):
         while True:
             
-            samples = 15
+            samples = 20
             time.sleep((0.004) * samples) # do some blocking computation
             if self.deviceID is not None:
                 # pull real data
-                self.data = self.UnicornBlack.data
+                self._plottingdata = numpy.array(self.UnicornBlack.sample_data(), copy=True)
+                self._plottingdata[:,0:8] = numpy.fliplr(self._plottingdata[:,0:8])
             #else:
             #    # show fake data
             #    for cS in range(samples):
             #        newdatapoints = numpy.ndarray.tolist(numpy.multiply(numpy.random.rand(self._numberOfAcquiredChannels), 100))
             #        self.data.append(newdatapoints) 
             #        self.data.pop(0)
-                            
-            self._plottingdata = numpy.array(self.data, copy=True)
         
             # but update the document from callback
             self.doc.add_next_tick_callback(partial(self.updatesamples))

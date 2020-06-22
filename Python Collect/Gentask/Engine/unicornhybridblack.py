@@ -1,5 +1,20 @@
 # unicornhybridblack: classes to communicate with g.tec Unicorn Hybrid Black
 #
+"""
+UnicornBlackThreads provides direct access to the thread functions
+
+UnicornBlackProcess provides the ability to run the device as a seperate process
+
+UnicornBlackCheckSignal provides a class to evaluate signal quality
+
+
+Working notes
+- Sometimes works when run in Spyder, but seems to work best when run in external
+
+
+@author: Matt Pontifex
+"""
+
 import os
 import math
 import numpy
@@ -7,22 +22,225 @@ import time
 from datetime import datetime
 from threading import Thread, Lock
 from multiprocessing import Queue
+import multiprocessing
+import matplotlib.mlab as mlab
+import scipy.signal
 
 # DEBUG #
 if __name__ == "__main__":
-    import UnicornPy as UnicornPy
+    try:
+        import UnicornPy as UnicornPy
+    except:
+        import Engine.UnicornPy as UnicornPy
 else:
-    import Engine.UnicornPy as UnicornPy
+    try:
+        import Engine.UnicornPy as UnicornPy
+    except:
+        import UnicornPy as UnicornPy
 
 
-class UnicornBlackFunctions():    
+
+class UnicornBlackCheckSignal():
+    
+    def __init__(self):
+        self.killcheck = multiprocessing.Event()
+        self.nbchan = 8
+        self.freqratio = []
+        self.pointstd = []
+        self._samplefreq = 250.0
+        self.highpassfilter = 0.1
+        self.lowpassfilter = 20
+        self.notchfilter = 60
+        self.scale = 500.0
+        self.controlband = [20, 40]
+        self.noiseband = [58, 62]
+        self.data = []
+        
+    def check(self):
+        self.freqratio = []
+        self.pointstd = []
+        #start = time.perf_counter()
+        for cP in range(self.nbchan):
+            signalnoiseratio, signalvariability = UnicornGroomQuality(self.data[:,cP], self.controlband, self.noiseband, self._samplefreq, self.scale, self.highpassfilter, self.lowpassfilter, self.notchfilter)
+            self.freqratio.append(signalnoiseratio)
+            self.pointstd.append(signalvariability)
+            #print('channel %d noise ratio: %0.2f' % (cP, signalnoiseratio))
+            #print('channel %d variance: %0.2f' % (cP, signalvariability))
+        #finish = time.perf_counter()
+        #print(f'Finished in {round(finish-start,8)} seconds(s)')
+        
+
+def UnicornGroomPSD(datavector, samplefreq=250.0, scale=500):
+    #print('UnicornGroomPSD: called')
+    # function to obtain spectral power
+    overlaplength = int(len(datavector)/3.0)
+    if (int(scale) <= overlaplength):
+        overlaplength = int(int(scale)/2.0)
+    
+    _power = []
+    _freqs = []
+    _power, _freqs = mlab.psd(x=datavector, NFFT=int(scale), Fs=samplefreq, noverlap=overlaplength, sides='onesided', scale_by_freq=True)
+    return _power, _freqs
+    #print('UnicornGroomPSD: complete')
+
+def UnicornGroomFilter(datavector, highpassfilter=0.1, lowpassfilter=20.0, notchfilter=60.0, samplefreq=250.0):
+    #print('UnicornGroomFilter: called')
+    # function to return filtered data
+    bhp, ahp = scipy.signal.butter(2, (highpassfilter / (samplefreq / 2)), btype='high')
+    blp, alp = scipy.signal.butter(2, (lowpassfilter / (samplefreq / 2)))
+    _hpfiltersettings = [bhp, ahp]
+    _lpfiltersettings = [blp, alp]
+    b, a = scipy.signal.iirnotch(notchfilter, 30.0, samplefreq) # Design notch filter
+    _notchfiltersettings = [b, a]
+    
+    # Apply notch filter
+    datavector = scipy.signal.filtfilt(b=_notchfiltersettings[0], a=_notchfiltersettings[1], x=datavector, padtype='constant', padlen=int(math.floor(len(datavector)/3.0)), method="pad") 
+    
+    # High pass
+    datavector = scipy.signal.filtfilt(b=_hpfiltersettings[0], a=_hpfiltersettings[1], x=datavector, padtype='constant', padlen=int(math.floor(len(datavector)/3.0)), method="pad") 
+                  
+    # low pass
+    datavector = scipy.signal.filtfilt(b=_lpfiltersettings[0], a=_lpfiltersettings[1], x=datavector, padtype='constant', padlen=int(math.floor(len(datavector)/3.0)), method="pad") 
+    
+    return datavector
+    #print('UnicornGroomFilter: complete')
+
+def UnicornGroomQuality(datavector, controlband, noiseband, samplefreq, scale, highpassfilter, lowpassfilter, notchfilter):
+    # function to evaluate quality of signal
+    signalnoiseratio = []
+    signalvariability = []
+    
+    datavector = numpy.ravel(datavector)
+
+    _power, _freqs = UnicornGroomPSD(datavector, samplefreq=samplefreq, scale=scale)
+    controlpower = numpy.median(_power[numpy.argmin(abs(_freqs-(controlband[0]))):numpy.argmin(abs(_freqs-(controlband[1])))])
+    noisepower = numpy.mean(_power[numpy.argmin(abs(_freqs-(noiseband[0]))):numpy.argmin(abs(_freqs-(noiseband[1])))])
+
+    if (float(controlpower) == float(0.0)):
+        controlpower = 0.0001
+                
+    signalnoiseratio = numpy.around(numpy.divide(noisepower, controlpower), decimals=1) # frequency ratio
+                         
+    datavector = UnicornGroomFilter(datavector, highpassfilter=highpassfilter, lowpassfilter=lowpassfilter, notchfilter=notchfilter, samplefreq=samplefreq)
+    signalvariability = numpy.std(datavector)
+    
+    return signalnoiseratio, signalvariability
+
+
+
+def UnicornJockey(deviceID, channellabels, rollingspan, logfilename, startrecordingeeg, eegready, eegrecording, safetologevent, markeeg, markvalue, pulleegdata, conn, stoprecordingeeg):
+    # this is the function that gets pushed to a seperate process that actually controls the device
+    
+    startedrecording = False
+    
+    # connect device
+    UnicornBlack = UnicornBlackThreads() 
+    UnicornBlack.channellabels = channellabels # change channel labels
+    UnicornBlack.connect(deviceID=deviceID, rollingspan=rollingspan, logfilename=logfilename)
+    eegready.set()
+                
+    continueroutine = True
+    while continueroutine:
+        
+        if not startedrecording:
+            if startrecordingeeg.is_set():
+                UnicornBlack.startrecording() # rename file name here
+                startedrecording = True
+                eegrecording.set()
+    
+        if startedrecording:
+            if stoprecordingeeg.is_set():
+                UnicornBlack._safetolog = True # push any remaining items to file
+                UnicornBlack.disconnect()
+                continueroutine = False
+                
+        if markeeg.is_set():
+            UnicornBlack.mark_event(markvalue.value) # Send trigger 
+            markeeg.clear()
+            
+        if safetologevent.is_set():
+            UnicornBlack.safe_to_log(True)
+        else:
+            UnicornBlack.safe_to_log(False)
+            
+        if pulleegdata.is_set():
+            sample = UnicornBlack.sample_data()
+            #print('UnicornJockey: Battery at %0.1f percent' % numpy.array(sample)[-1,-3])
+            conn.send(sample[:])
+            pulleegdata.clear()
+
+class UnicornBlackProcess():  
+    # this will be the class that the user interfaces with that intializes and maintains the multiprocessing
+    
+    def __init__(self):
+        self.channellabels = 'FZ, C3, CZ, C4, PZ, O1, OZ, O2, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
+        self.samplefreq = 250.0
+        self.numberOfAcquiredChannels = 17
+        self.ready = False
+        self.recording = False
+        
+    def connect(self, deviceID=None, rollingspan=3.0, logfilename='default'):
+        # because of the multiprocessing, to not create additional headaches, the file name needs to be initiallized at connect
+        
+        self.deviceID = deviceID
+        self.rollingspan = rollingspan
+        self.logfilename = logfilename
+        
+        # connect to Device
+        self.startrecordingeeg = multiprocessing.Event()
+        self.stoprecordingeeg = multiprocessing.Event()
+        self.eegready = multiprocessing.Event()
+        self.eegrecording = multiprocessing.Event()
+        self.safetologevent = multiprocessing.Event()
+        self.markeeg = multiprocessing.Event()
+        self.markvalue = multiprocessing.Value('i', 0)
+        
+        # code to be able to pull data
+        self.pulleegdata = multiprocessing.Event()
+        self.pulleegdata1, self.pulleegdata2 = multiprocessing.Pipe()
+        
+        self.p = multiprocessing.Process(target=UnicornJockey, args=[self.deviceID, self.channellabels, self.rollingspan, self.logfilename, self.startrecordingeeg, self.eegready, self.eegrecording, self.safetologevent, self.markeeg, self.markvalue, self.pulleegdata, self.pulleegdata2, self.stoprecordingeeg])
+        self.p.start()
+        self.eegready.wait(3.0) # wait up to 3 seconds
+        self.ready = True
+        
+    def startrecording(self):
+        self.startrecordingeeg.set()
+        self.eegrecording.wait(3.0) # wait up to 3 seconds
+        self.recording = True
+        
+    def disconnect(self):
+        self.stoprecordingeeg.set()
+        self.p.join()
+        self.pulleegdata1.close() 
+        
+    def mark_event(self, event):
+        self.markvalue.value = event
+        self.markeeg.set()
+        
+    def safe_to_log(self, boolsafe=True):
+        """Parameter to change logging settings
+        """
+        if boolsafe:
+            self.safetologevent.set()
+        else:
+            self.safetologevent.clear()
+        
+    def sample_data(self):
+        self.pulleegdata.set() # tell process to obtain a sample
+        data = self.pulleegdata1.recv()
+        #tempdata = numpy.array(data)
+        #print('UnicornBlackProcess: Battery at %0.1f percent' % tempdata[-1,-3])
+        return data
+
+class UnicornBlackThreads():    
     """class for data collection using the g.tec Unicorn Hybrid Black
 	"""
     
     def __init__(self):
 
         # establish variables
-        self.collectversion = '2020.05.27.2'
+        self.collectversion = '2020.05.30.0'
         self.device = None;
         self.path = os.path.dirname(os.getcwd())
         self.outputfolder = 'Raw'
@@ -59,9 +277,10 @@ class UnicornBlackFunctions():
         self.data = None
         
     
-    def connect(self, deviceID=None, rollingspan=15.0):
+    def connect(self, deviceID=None, rollingspan=3.0, logfilename='default'):
         
         self.deviceID = deviceID;
+        self.logfilename = logfilename
         # make sure everything is disconnected
         try:
             self.device.StopAcquisition()
@@ -99,62 +318,66 @@ class UnicornBlackFunctions():
         # Open selected device.
         try:
             self.device = UnicornPy.Unicorn(self.deviceID)
+            
+            # Initialize acquisition members.
+            self._rollingspan = rollingspan # seconds
+            self._logchunksize = int(math.floor(5 * self._samplefreq))
+                    
+            self._numberOfAcquiredChannels = self.device.GetNumberOfAcquiredChannels()
+            self._configuration = self.device.GetConfiguration()
+        
+            # Allocate memory for the acquisition buffer.
+            self._receiveBufferBufferLength = self._frameLength * self._numberOfAcquiredChannels * 4
+            self._receiveBuffer = bytearray(self._receiveBufferBufferLength)
+            self.data = [[0.0] * self._numberOfAcquiredChannels] * math.floor( float(self._rollingspan) * float(self._samplefreq) )
+                    
+            try:
+                # initialize sample streamer
+                self._streaming = True
+                self._ssthread = Thread(target=self._stream_samples, args=[self._logsamplequeue], daemon=True)
+                self._ssthread.name = 'samplestreamer'
+            except:
+                print("Error initializing sample streamer.")
+            
+                
+            try:
+                # initialize data recorder
+                self._recording = True
+                self._drthread = Thread(target=self._log_sample, args=[self._logsamplequeue], daemon=True)
+                self._drthread.name = 'datarecorder'
+                
+            except:
+                print("Error initializing data recorder.")
+                
+                
+            try:
+                # initialize event recorder
+                self._eventrecording = True
+                self._erthread = Thread(target=self._log_event, args=[self._logeventqueue], daemon=True)
+                self._erthread.name = 'eventrecorder'
+                
+            except:
+                print("Error initializing event recorder.")
+                
+                
+            try:
+                # start processes
+                self.device.StartAcquisition(False)  # True - test signal; False - measurement mode
+            except:
+                print("Error starting acquisition.")
+                
+            self.logdata = False
+            self._ssthread.start()
+            self._drthread.start()
+            self._erthread.start()
+            
+            time.sleep(1) # give it some initialization time
+            
             print("Connected to '%s'." %self.deviceID)
         except:
             print("Unable to connect to '%s'." %self.deviceID)
             
-        # Initialize acquisition members.
-        self._rollingspan = rollingspan # seconds
-        self._logchunksize = int(math.floor(5 * self._samplefreq))
-                
-        self._numberOfAcquiredChannels = self.device.GetNumberOfAcquiredChannels()
-        self._configuration = self.device.GetConfiguration()
-    
-        # Allocate memory for the acquisition buffer.
-        self._receiveBufferBufferLength = self._frameLength * self._numberOfAcquiredChannels * 4
-        self._receiveBuffer = bytearray(self._receiveBufferBufferLength)
-        self.data = [[0.0] * self._numberOfAcquiredChannels] * math.floor( float(self._rollingspan) * float(self._samplefreq) )
-                
-        try:
-            # initialize sample streamer
-            self._streaming = True
-            self._ssthread = Thread(target=self._stream_samples, args=[self._logsamplequeue], daemon=True)
-            self._ssthread.name = 'samplestreamer'
-        except:
-            print("Error initializing sample streamer.")
         
-            
-        try:
-            # initialize data recorder
-            self._recording = True
-            self._drthread = Thread(target=self._log_sample, args=[self._logsamplequeue], daemon=True)
-            self._drthread.name = 'datarecorder'
-            
-        except:
-            print("Error initializing data recorder.")
-            
-            
-        try:
-            # initialize event recorder
-            self._eventrecording = True
-            self._erthread = Thread(target=self._log_event, args=[self._logeventqueue], daemon=True)
-            self._erthread.name = 'eventrecorder'
-            
-        except:
-            print("Error initializing event recorder.")
-            
-            
-        try:
-            # start processes
-            self.device.StartAcquisition(False)  # True - test signal; False - measurement mode
-        except:
-            print("Error starting acquisition.")
-            
-        self.logdata = False
-        self._ssthread.start()
-        self._drthread.start()
-        self._erthread.start()
-        print("Connection Complete")
         
     def disconnect(self):
        
@@ -162,9 +385,12 @@ class UnicornBlackFunctions():
         
         #self.stoprecording()       
         self._streaming = False
-        self._ssthread.join()
-        self._drthread.join()
-        self._erthread.join()
+        try:
+            self._ssthread.join()
+            self._drthread.join()
+            self._erthread.join()
+        except:
+            pass
 	
         try:
             self.device.StopAcquisition()
@@ -178,7 +404,7 @@ class UnicornBlackFunctions():
         
         del self.device
         self.device = None
-        print("Disconnection Complete")
+        print("Disconnected from '%s'." %self.deviceID)
         
     def _stream_samples(self, queue):
         """Continuously polls the device, and puts all new samples in a
@@ -225,6 +451,10 @@ class UnicornBlackFunctions():
                 self._receiveBuffer = bytearray(self._receiveBufferBufferLength) # make sure everything is cleared
                 self._bufferlock.release()
         
+            #time.sleep(float(0.000000000001)) 
+            # if it is in, then we suddenly start getting blocking and drop samples
+            # if we comment it out then we get all the samples, but run into an issue with screen flips
+            
         self._queuelock.acquire(True)
         queue.put(None) # poison pill approach
         self._queuelock.release()
@@ -335,10 +565,9 @@ class UnicornBlackFunctions():
                 self._eventlogfile.close()
         
         
-    def startrecording(self, logfilename='default'):
+    def startrecording(self):
         
         self.logdata = True
-        self.logfilename = self.path + os.path.sep + self.outputfolder + os.path.sep + logfilename
         timetemp = str(datetime.now()).split()
         self._timetemp = timetemp[0] + 'T' + timetemp[1]
         self._logfile = open('%s.csv' % (self.logfilename), 'w')
@@ -380,39 +609,48 @@ class UnicornBlackFunctions():
             self._logeventqueue.put(numpy.array([str(self.lastsampledpoint), str(event)]))
             self._logeventlock.release()
         
-
-            
+    def safe_to_log(self, boolsafe=True):
+        """Parameter to change logging settings
+        """
+        self._safetolog = boolsafe  
+        
+    def sample_data(self):
+        datasample = self.data[:]
+        return datasample
             
             
 # # # # #
 # DEBUG #
 if __name__ == "__main__":
     
-    from psychopy import core
+    duration = 5 # seconds
+    example = 'Process' # Process or Thread
     
-    cumulativeTime = core.Clock(); cumulativeTime.reset()
+    if example == 'Process':
+        # Example code for calling the Unicorn device as a process
+        UnicornBlack = UnicornBlackProcess()  
+    else:    
+        # Example code for calling the Unicorn device as a thread
+        UnicornBlack = UnicornBlackThreads()   
+        
+    # all other functions and calls remain the same    
+    UnicornBlack.connect(deviceID='UN-2019.05.51', rollingspan=3, logfilename='recordeddata_thread')
     
-    UnicornBlack = UnicornBlackFunctions()   
+    UnicornBlack.startrecording()
     
-    UnicornBlack.connect(deviceID='UN-2019.05.51', rollingspan=10)
-    
-    UnicornBlack.startrecording('recordeddata')
-    
-    for incrX in range(60):
+    for incrX in range(duration):
         time.sleep(1)
-        UnicornBlack._safetolog = False
+        UnicornBlack.safe_to_log(False)
         UnicornBlack.mark_event(incrX)
         print("Time Lapsed: %d second" % (incrX+1))
-        UnicornBlack._safetolog = True
+        UnicornBlack.safe_to_log(True)
         
+    example = numpy.array(UnicornBlack.sample_data())
+    print('Battery at %0.1f percent' % example[-1,-3])
     UnicornBlack.disconnect()
     
-    print("Elapsed time: %.6f" % cumulativeTime.getTime())
-    
     # Plotting function to check for dropped samples
-    import matplotlib.pyplot as plt 
-    #sampleddata = UnicornBlack.data
-    
+    #
     #selectsampleddata = []
     #for incrX in range(len(sampleddata)):
     #    if not (sampleddata[incrX][0] == float(0)):
@@ -433,40 +671,40 @@ if __name__ == "__main__":
     #    print('The streamer had a total of %d dropped samples (%0.1f%%).' %(len(y)-numpy.count_nonzero(y), ((len(y)-numpy.count_nonzero(y))/len(y))*100))
         
     # show saved data
-    lis = []
-    with open("C:\\Studies\\Python Collect\\Gentask\\Raw\\recordeddata.csv", "rb") as f: 
-        for cnt, line in enumerate(f):
-            lis.append(line.decode("utf-8").split(','))
-    f.close()
-    del cnt, line
-    lis = lis[7:-1]
-    x2 = numpy.arange(int(float(lis[0][15])),int(float(lis[-1][15])),1) 
-    y2 = numpy.array([0] * len(x2))
-    for incrX in range(len(lis)):
-        index_min = numpy.argmin(abs(x2-(int(float(lis[incrX][15])))))
-        y2[index_min] = 1
-    del index_min, incrX
+    #lis = []
+    #with open("C:\\Studies\\Python Collect\\Gentask\\Raw\\recordeddata.csv", "rb") as f: 
+    #    for cnt, line in enumerate(f):
+    #        lis.append(line.decode("utf-8").split(','))
+    #f.close()
+    #del cnt, line
+    #lis = lis[7:-1]
+    #x2 = numpy.arange(int(float(lis[0][15])),int(float(lis[-1][15])),1) 
+    #y2 = numpy.array([0] * len(x2))
+    #for incrX in range(len(lis)):
+    #    index_min = numpy.argmin(abs(x2-(int(float(lis[incrX][15])))))
+    #    y2[index_min] = 1
+    #del index_min, incrX
     
     
     # read in event markers
-    eventlis = []
-    with open("C:\\Studies\\Python Collect\\Gentask\\Raw\\recordeddata.csve", "rb") as f: 
-        for cnt, line in enumerate(f):
-            eventlis.append(line.decode("utf-8").split(','))
-    f.close()
-    del cnt, line
-    eventlis = eventlis[4:-1]
+    #eventlis = []
+    #with open("C:\\Studies\\Python Collect\\Gentask\\Raw\\recordeddata.csve", "rb") as f: 
+    #    for cnt, line in enumerate(f):
+    #        eventlis.append(line.decode("utf-8").split(','))
+    #f.close()
+    #del cnt, line
+    #eventlis = eventlis[4:-1]
     
-    y3 = numpy.array([0] * len(x2))
-    for incrX in range(len(eventlis)):
-        index_min = numpy.argmin(abs(x2-(int(float(eventlis[incrX][0])))))
-        y3[index_min] = 2
-    del index_min, incrX
-    
-    x2 = x2 * (1/ 250.0)
-    plt.plot(x2,y2)
-    plt.plot(x2,y3)
-    print('The recording had a total of %d dropped samples (%0.1f%%).' %(len(y2)-numpy.count_nonzero(y2), ((len(y2)-numpy.count_nonzero(y2))/len(y2))*100))
+    #y3 = numpy.array([0] * len(x2))
+    #for incrX in range(len(eventlis)):
+    #    index_min = numpy.argmin(abs(x2-(int(float(eventlis[incrX][0])))))
+    #    y3[index_min] = 2
+    #del index_min, incrX
+    # 
+    # x2 = x2 * (1/ 250.0)
+    #plt.plot(x2,y2)
+    #plt.plot(x2,y3)
+    #print('The recording had a total of %d dropped samples (%0.1f%%).' %(len(y2)-numpy.count_nonzero(y2), ((len(y2)-numpy.count_nonzero(y2))/len(y2))*100))
     
     
     # core.wait was responsible for the dropped samples!
