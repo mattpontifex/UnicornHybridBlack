@@ -1,4 +1,4 @@
 deviceID = UN-2019.05.51
 channellabels = FZ, C3, CZ, C4, PZ, O1, OZ, O2
-rollingspan = 5
+rollingspan = 10
 filtersettings = 0.5, 30
