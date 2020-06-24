@@ -8,16 +8,16 @@ can load the python functions using:
 
 UnicornBlackProcess provides the ability to run the device using multiprocessing so that it can run in the background collecting data. 
 
-    UnicornBlack = UnicornBlackProcess() 
+    UnicornBlack = unicornhybridblack.UnicornBlackProcess() 
 
 UnicornBlackThreads provides direct access to the thread functions.
   
-    UnicornBlack = UnicornBlackThreads() 
+    UnicornBlack = unicornhybridblack.UnicornBlackThreads() 
 
 UnicornBlackCheckSignal provides a class to evaluate signal quality based upon the variability of the signal and the ratio of frequency power in a noise
 band relative to a control band.
   
-    UnicornBlack = UnicornBlackCheckSignal()
+    UnicornBlack = unicornhybridblack.UnicornBlackCheckSignal()
 
 
 Package Contents
@@ -39,8 +39,8 @@ You will still need to have the python API (https://www.unicorn-bi.com/product/u
 Execution
 ------------
 It is suggested that you use Anaconda Spyder 3 with python 3.0 or higher. Spyder however does not play nicely with multiprocessing, so you should change the settings to have Spyder run the task in an external system terminal. 
-Select Run -> Configuration per file... 
-Change the Console to Execute in an external system terminal
-Select the checkbox for External system terminal Interact with the Python console after execution
+Select Run -> Configuration per file...   
+Change the Console to Execute in an external system terminal  
+Select the checkbox for External system terminal Interact with the Python console after execution  
 
 Then you can click the Run file button in Spyder on the PythonCollect -> Gentask -> ExampleTask.py file.
