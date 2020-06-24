@@ -1,0 +1,50 @@
+gentask.....= PsychoPy_Engine_3
+date........= 2020-06-24
+time........= 11:05:29.509452
+refreshrate.= 16.669 ms
+  Trial           Event        Duration             ISI             ITI            Type            Resp         Correct         Latency    ClockLatency         Trigger      MinRespWin      MaxRespWin        Stimulus
+    ---             ---             ---             ---             ---             ---             ---             ---             ---             ---             ---             ---             ---        ---
+      1        Stimulus          84.946        1925.814        1985.308               0             nan               1             nan        5.008061               1           83.33          216.67        nothing.png     
+      2        Stimulus          84.895        1885.890        1983.532               0             nan               1             nan        7.018973               1           83.33          216.67        nothing.png     
+      3        Stimulus         184.892        1831.598        1983.486               8               a               1         615.440        8.989918               1           83.33         1816.67        Circle_Green_Up.png
+      3        Response             nan             nan             nan             nan               a             nan         615.440        9.621667               1             nan             nan        nan
+      4        Stimulus         184.926        1764.847        1983.493               6               a               1         444.739       11.006636               1           83.33         1816.67        Circle_Blue_Up.png
+      4        Response             nan             nan             nan             nan               a             nan         444.739       11.500689               1             nan             nan        nan
+      5        Stimulus         184.899        1798.336        1983.503              12               l               1         495.178       12.956644               1           83.33         1816.67        Square_Green_Up.png
+      5        Response             nan             nan             nan             nan               l             nan         495.178       13.467416               1             nan             nan        nan
+      6        Stimulus         184.866        1798.371        1983.478              10               l               1         446.719       14.940034               1           83.33         1816.67        Square_Blue_Up.png
+      6        Response             nan             nan             nan             nan               l             nan         446.719       15.402080               1             nan             nan        nan
+      7        Stimulus         184.829        1819.371        1983.488               6               a               1         428.540       16.923424               1           83.33         1816.67        Circle_Blue_Up.png
+      7        Response             nan             nan             nan             nan               a             nan         428.540       17.367049               1             nan             nan        nan
+      8        Stimulus         184.522        1780.355        1983.512               8               a               1         361.691       18.927797               1           83.33         1816.67        Circle_Green_Up.png
+      8        Response             nan             nan             nan             nan               a             nan         361.691       19.325287               1             nan             nan        nan
+      9        Stimulus         184.518        1795.975        1983.443              10               l               1         425.107       20.892829               1           83.33         1816.67        Square_Blue_Up.png
+      9        Response             nan             nan             nan             nan               l             nan         425.107       21.335100               1             nan             nan        nan
+     10        Stimulus         184.580        1804.808        1983.453              12               l               1         431.422       22.873481               1           83.33         1816.67        Square_Green_Up.png
+     10        Response             nan             nan             nan             nan               l             nan         431.422       23.319118               1             nan             nan        nan
+     11        Stimulus         184.570        1815.944        1983.533               8               a               1         415.785       24.863015               1           83.33         1816.67        Circle_Green_Up.png
+     11        Response             nan             nan             nan             nan               a             nan         415.785       25.298950               1             nan             nan        nan
+     12        Stimulus         184.892        1791.719        1983.486              12               l               1         373.858       26.863730               1           83.33         1816.67        Square_Green_Up.png
+     12        Response             nan             nan             nan             nan               l             nan         373.858       27.274718               1             nan             nan        nan
+     13        Stimulus         184.909        1781.610        1983.498               6               a               1         385.561       28.840618               1           83.33         1816.67        Circle_Blue_Up.png
+     13        Response             nan             nan             nan             nan               a             nan         385.561       29.256434               1             nan             nan        nan
+     14        Stimulus         184.529        1840.745        1983.493              10               l               1         435.116       30.807312               1           83.33         1816.67        Square_Blue_Up.png
+     14        Response             nan             nan             nan             nan               l             nan         435.116       31.255703               1             nan             nan        nan
+     15        Stimulus         184.795        1755.992        1983.535              10               l               1         432.668       32.832726               1           83.33         1816.67        Square_Blue_Up.png
+     15        Response             nan             nan             nan             nan               l             nan         432.668       33.320450               1             nan             nan        nan
+     16        Stimulus         184.792        1814.285        1983.477               6               l               0         441.487       34.773682               1           83.33         1816.67        Circle_Blue_Up.png
+     16        Response             nan             nan             nan             nan               l             nan         441.487       35.227477               1             nan             nan        nan
+     16        Response             nan             nan             nan             nan               a             nan         540.519       35.314202               1             nan             nan        nan
+     17        Stimulus         184.813        1787.647        1983.471              12               l               1         456.637       36.772903               1           83.33         1816.67        Square_Green_Up.png
+     17        Response             nan             nan             nan             nan               l             nan         456.637       37.257447               1             nan             nan        nan
+     18        Stimulus         184.529        1818.923        1983.448               8               a               1         577.130       38.745523               1           83.33         1816.67        Circle_Green_Up.png
+     18        Response             nan             nan             nan             nan               a             nan         577.130       39.339549               1             nan             nan        nan
+     19        Stimulus         184.867        1787.088        1983.478              12               l               1         465.779       40.749119               1           83.33         1816.67        Square_Green_Up.png
+     19        Response             nan             nan             nan             nan               l             nan         465.779       41.251797               1             nan             nan        nan
+     20        Stimulus         184.479        1787.119        1983.436              10               l               1         803.508       42.721237               1           83.33         1816.67        Square_Blue_Up.png
+     20        Response             nan             nan             nan             nan               l             nan         803.508       43.550120               1             nan             nan        nan
+     21        Stimulus         184.524        1796.420        1983.489               8               a               1         589.818       44.693011               1           83.33         1816.67        Circle_Green_Up.png
+     21        Response             nan             nan             nan             nan               a             nan         589.818       45.296367               1             nan             nan        nan
+     22        Stimulus         184.781        1787.700        1983.474               6               a               1         504.271       46.674140               1           83.33         1816.67        Circle_Blue_Up.png
+     22        Response             nan             nan             nan             nan               a             nan         504.271       47.189404               1             nan             nan        nan
+taskruntime.= 48.646654 sec
