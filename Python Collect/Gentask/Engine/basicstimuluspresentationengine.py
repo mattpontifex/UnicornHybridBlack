@@ -132,6 +132,7 @@ class Engine():
         self.cumulativeTime = core.Clock()
         self.initializetime = core.getTime()
         self.previoustrialforexperimentermarker = [0,0,0,0]
+        self.printoutput = False
         
         self.participantwinActive = False
         
@@ -139,6 +140,8 @@ class Engine():
         
     def start(self):
 
+        if self.debug:
+            self.printoutput = True
         
         ##### Prompt for filename or use default ##### 
         if not self.testblock:
@@ -172,6 +175,8 @@ class Engine():
             if not unicornmodule:
                 print('ERROR: The unicornhybridblack module was unable to be loaded.')
                 self.quit = True
+                
+                
         
         #####  Start Windows ##### 
         if not self.quit:
@@ -192,6 +197,50 @@ class Engine():
                 self.experimenternotificationtext = visual.TextStim(self.experimenterwin, text='...', height = 0.05, pos=[-0.95,-0.95], alignHoriz = 'left', alignVert='bottom', color=self.experimentermonitor.forgroundcolor, autoLog=False)
                 self.experimenternotificationtext.setAutoDraw(True); self.experimenterwin.flip()
             
+            
+            
+            
+        
+            ##### Parameter update ##### 
+            if (len(self.unicorn) > 0):
+                
+                if self.expdisp:
+                    self.experimenternotificationtext.setText('initializing unicorn system...'); self.experimenterwin.flip()
+                    
+                try:
+                    # connect to Device
+                    self.UnicornBlack = unicornhybridblack.UnicornBlackProcess()
+                    self.UnicornBlack.channellabels = self.unicornchannels
+                    self.UnicornBlack.printoutput = self.printoutput
+                    self.UnicornBlack.connect(deviceID=self.unicorn, rollingspan=2.0, logfilename=self.folders.outputfolder + os.path.sep + self.prefix + self.filename + self.suffix)
+                    
+                    # wait 3 seconds for connection
+                    continueExperiment = False
+                    checktimer = core.CountdownTimer(start=3.0)
+                    while (checktimer.getTime() > 0):
+                        if self.UnicornBlack.ready:
+                            continueExperiment = True
+                    if not continueExperiment:
+                        self.quit = True
+                    else:
+                        powerlevel = self.UnicornBlack.check_battery()
+                        if (powerlevel < 1):
+                            print('ERROR: The device is out of battery.')
+                            self.quit = True
+                    
+                    self.UnicornBlack.startrecording() 
+                    
+                    
+                except:
+                    print('ERROR: An error occurred while attempting to connect to the Unicorn device.')
+                    self.quit = True
+            
+            
+                if self.expdisp:
+                    self.experimenternotificationtext.setText('unicorn recording...'); self.experimenterwin.flip()
+                    
+                    
+                    
                 
             # Start Showing Windows
             self.participantwin.flip()
@@ -341,44 +390,6 @@ class Engine():
             
             
         
-        
-            ##### Parameter update ##### 
-            if (len(self.unicorn) > 0):
-                
-                if self.expdisp:
-                    self.experimenternotificationtext.setText('initializing unicorn system...'); self.experimenterwin.flip()
-                    
-                try:
-                    # connect to Device
-                    self.UnicornBlack = unicornhybridblack.UnicornBlackProcess()
-                    self.UnicornBlack.channellabels = self.unicornchannels
-                    self.UnicornBlack.connect(deviceID=self.unicorn, rollingspan=2.0, logfilename=self.folders.outputfolder + os.path.sep + self.prefix + self.filename + self.suffix)
-                    
-                    # wait 3 seconds for connection
-                    continueExperiment = False
-                    checktimer = core.CountdownTimer(start=3.0)
-                    while (checktimer.getTime() > 0):
-                        if self.UnicornBlack.ready:
-                            continueExperiment = True
-                    if not continueExperiment:
-                        self.quit = True
-                    else:
-                        powerlevel = self.UnicornBlack.check_battery()
-                        if (powerlevel < 1):
-                            print('ERROR: The device is out of battery.')
-                            self.quit = True
-                    
-                    self.UnicornBlack.startrecording() 
-                    
-                    
-                except:
-                    print('ERROR: An error occurred while attempting to connect to the Unicorn device.')
-                    self.quit = True
-            
-            
-                if self.expdisp:
-                    self.experimenternotificationtext.setText('unicorn recording...'); self.experimenterwin.flip()
-                    
             
             
             
@@ -477,9 +488,9 @@ class Engine():
                     self.experimenternotificationtext.setText('starting...'); self.experimenterwin.flip()
                 
                 # Prep process
-                self.participantwin.flip(); self.sendtrigger(0) # Send trigger
-                self.participantwin.flip(); self.sendtrigger(0) # Send trigger
-                self.participantwin.flip(); self.sendtrigger(0) # Send trigger
+                #self.participantwin.flip(); self.sendtrigger(0) # Send trigger
+                #self.participantwin.flip(); self.sendtrigger(0) # Send trigger
+                #self.participantwin.flip(); self.sendtrigger(0) # Send trigger
                 
                 time.sleep(self.delaybeforestart)
                 
@@ -577,8 +588,6 @@ class Engine():
                             
                             
                             
-                            
-                            
                             if self.debug:
                                 checktimes = []
                                 
@@ -591,6 +600,7 @@ class Engine():
                                     print('Prestim period: %f' % float(self.sequencelist[self.trial][self.seqNpreStimulusInterval]))
                                     print('Stimulus duration: %f' % float(self.sequencelist[self.trial][self.seqNstimulusDuration]))
                                     print('Response window: %f' % float(self.sequencelist[self.trial][self.seqNresponseWindow_max]))
+                                    print('Participant keys: ', self.participantkeys)
                                     
                                 
                                 while self.continuetrial:
@@ -641,6 +651,8 @@ class Engine():
                                                 turnstimoff = True
                                                 self.continuetrial = False # End Trial
                                             self.updateexperimentermarker(theseKeys[0][0],gt)
+                                            if self.debug:
+                                                print('keypress received:', theseKeys[0][0])
                         
                                         if ((self.elapsedTime.getTime() - self.stimOnTime) >= (float(self.sequencelist[self.trial][self.seqNresponseWindow_max]))): # If the maximum response window duration has expired
                                             self.continuetrial = False # End Trial
@@ -797,6 +809,8 @@ class Engine():
                                     self.trialcorr = 1 # Non-response was the correct answer
                                 else:
                                     self.trialcorr = 0 # Trial was incorrect
+                                if self.debug:
+                                    print('No response was made. Trial accuracy is:', self.trialcorr)
                             else:
                                 if (numpy.less(float(self.trialRT), float(self.sequencelist[self.trial][self.seqNresponseWindow_min]))):
                                     self.trialcorr = -1 # The response was impulsive and outside the window
@@ -810,6 +824,8 @@ class Engine():
                                         self.trialcorr = 1 # Trial was correct
                                     else:
                                         self.trialcorr = 0 # Trial was incorrect
+                                    if self.debug:
+                                        print('A response was received in the window. Trial accuracy is:', self.trialcorr)
                                         
                             # Load Data Into Spec Array
                             self.specarray[self.trial][0] = self.trial # Trial

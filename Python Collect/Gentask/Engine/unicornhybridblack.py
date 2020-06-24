@@ -128,7 +128,7 @@ def UnicornGroomQuality(datavector, controlband, noiseband, samplefreq, scale, h
 
 
 
-def UnicornJockey(deviceID, channellabels, rollingspan, logfilename, startrecordingeeg, eegready, eegrecording, safetologevent, markeeg, markvalue, pulleegdata, conn, stoprecordingeeg):
+def UnicornJockey(deviceID, channellabels, rollingspan, logfilename, printoutput, startrecordingeeg, eegready, eegrecording, safetologevent, markeeg, markvalue, pulleegdata, conn, stoprecordingeeg):
     # this is the function that gets pushed to a seperate process that actually controls the device
     
     startedrecording = False
@@ -136,6 +136,7 @@ def UnicornJockey(deviceID, channellabels, rollingspan, logfilename, startrecord
     # connect device
     UnicornBlack = UnicornBlackThreads() 
     UnicornBlack.channellabels = channellabels # change channel labels
+    UnicornBlack.printoutput = printoutput
     UnicornBlack.connect(deviceID=deviceID, rollingspan=rollingspan, logfilename=logfilename)
     eegready.set()
                 
@@ -178,6 +179,7 @@ class UnicornBlackProcess():
         self.numberOfAcquiredChannels = 17
         self.ready = False
         self.recording = False
+        self.printoutput = False
         
     def connect(self, deviceID=None, rollingspan=3.0, logfilename='default'):
         # because of the multiprocessing, to not create additional headaches, the file name needs to be initiallized at connect
@@ -199,7 +201,7 @@ class UnicornBlackProcess():
         self.pulleegdata = multiprocessing.Event()
         self.pulleegdata1, self.pulleegdata2 = multiprocessing.Pipe()
         
-        self.p = multiprocessing.Process(target=UnicornJockey, args=[self.deviceID, self.channellabels, self.rollingspan, self.logfilename, self.startrecordingeeg, self.eegready, self.eegrecording, self.safetologevent, self.markeeg, self.markvalue, self.pulleegdata, self.pulleegdata2, self.stoprecordingeeg])
+        self.p = multiprocessing.Process(target=UnicornJockey, args=[self.deviceID, self.channellabels, self.rollingspan, self.logfilename, self.printoutput, self.startrecordingeeg, self.eegready, self.eegrecording, self.safetologevent, self.markeeg, self.markvalue, self.pulleegdata, self.pulleegdata2, self.stoprecordingeeg])
         self.p.start()
         self.eegready.wait(3.0) # wait up to 3 seconds
         self.ready = True
@@ -285,6 +287,7 @@ class UnicornBlackThreads():
         self._receiveBuffer = None
         self.lastsampledpoint = None
         self.data = None
+        self.printoutput = True
         
     
     def connect(self, deviceID=None, rollingspan=3.0, logfilename='default'):
@@ -383,9 +386,11 @@ class UnicornBlackThreads():
             
             time.sleep(1) # give it some initialization time
             
-            print("Connected to '%s'." %self.deviceID)
+            if self.printoutput:
+                print("Connected to '%s'." %self.deviceID)
         except:
-            print("Unable to connect to '%s'." %self.deviceID)
+            if self.printoutput:
+                print("Unable to connect to '%s'." %self.deviceID)
             
         
         
@@ -414,7 +419,8 @@ class UnicornBlackThreads():
         
         del self.device
         self.device = None
-        print("Disconnected from '%s'." %self.deviceID)
+        if self.printoutput:
+            print("Disconnected from '%s'." %self.deviceID)
         
     def _stream_samples(self, queue):
         """Continuously polls the device, and puts all new samples in a
@@ -441,7 +447,8 @@ class UnicornBlackThreads():
             except:
                 self._receiveBufferBufferLength = self._frameLength * self._numberOfAcquiredChannels * 4
                 self._receiveBuffer = bytearray(self._receiveBufferBufferLength)
-                print('\n\nMotherfucking overflow error in polling device.\n\n') 
+                if self.printoutput:
+                    print('\n\nOverflow error in polling device.\n\n') 
             self._bufferlock.release()
             
             
@@ -589,7 +596,8 @@ class UnicornBlackThreads():
         while (str(int(float(self.data[-1][15]))) == str(int(float(0.0)))):
             nc = nc + 1
         
-        print("Starting Recording")
+        if self.printoutput:
+            print("Starting Recording")
 	
                         
     def _log_header(self):
@@ -635,7 +643,9 @@ class UnicornBlackThreads():
             powerlevel = int(_plottingdata[-1,-3]) # update power level
         except:
             powerlevel = 0
-        print('Device battery at %d percent.' % powerlevel)
+            
+        if self.printoutput:
+            print('Device battery at %d percent.' % powerlevel)
         return powerlevel
     
 # # # # #
