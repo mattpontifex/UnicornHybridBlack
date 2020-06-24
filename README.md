@@ -38,7 +38,7 @@ You will still need to have the python API (https://www.unicorn-bi.com/product/u
 
 Execution
 ------------
-It is suggested that you use Anaconda Spyder 3 with python 3.0 or higher. Spyder however does not play nicely with multiprocessing, so you should change the settings to have Spyder run the task in an external system terminal. 
+It is suggested that you use Anaconda Spyder 3 with python 3.0 or higher. Spyder however does not play nicely with multiprocessing, so you should change the settings to have Spyder run the task in an external system terminal.   
 Select Run -> Configuration per file...   
 Change the Console to Execute in an external system terminal  
 Select the checkbox for External system terminal Interact with the Python console after execution  
