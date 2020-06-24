@@ -142,6 +142,10 @@ def UnicornJockey(deviceID, channellabels, rollingspan, logfilename, startrecord
     continueroutine = True
     while continueroutine:
         
+        if markeeg.is_set():
+            UnicornBlack.mark_event(markvalue.value) # Send trigger 
+            markeeg.clear()
+            
         if not startedrecording:
             if startrecordingeeg.is_set():
                 UnicornBlack.startrecording() # rename file name here
@@ -154,10 +158,6 @@ def UnicornJockey(deviceID, channellabels, rollingspan, logfilename, startrecord
                 UnicornBlack.disconnect()
                 continueroutine = False
                 
-        if markeeg.is_set():
-            UnicornBlack.mark_event(markvalue.value) # Send trigger 
-            markeeg.clear()
-            
         if safetologevent.is_set():
             UnicornBlack.safe_to_log(True)
         else:
@@ -232,6 +232,16 @@ class UnicornBlackProcess():
         #tempdata = numpy.array(data)
         #print('UnicornBlackProcess: Battery at %0.1f percent' % tempdata[-1,-3])
         return data
+    
+    def check_battery(self):
+        _plottingdata = numpy.array(self.sample_data(), copy=True)
+        powerlevel = 0
+        try:
+            powerlevel = int(_plottingdata[-1,-3]) # update power level
+        except:
+            powerlevel = 0
+        print('Device battery at %d percent.' % powerlevel)
+        return powerlevel
 
 class UnicornBlackThreads():    
     """class for data collection using the g.tec Unicorn Hybrid Black
@@ -618,7 +628,16 @@ class UnicornBlackThreads():
         datasample = self.data[:]
         return datasample
             
-            
+    def check_battery(self):
+        _plottingdata = numpy.array(self.sample_data(), copy=True)
+        powerlevel = 0
+        try:
+            powerlevel = int(_plottingdata[-1,-3]) # update power level
+        except:
+            powerlevel = 0
+        print('Device battery at %d percent.' % powerlevel)
+        return powerlevel
+    
 # # # # #
 # DEBUG #
 if __name__ == "__main__":
