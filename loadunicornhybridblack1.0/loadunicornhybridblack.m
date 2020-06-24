@@ -185,34 +185,38 @@ function [EEG, command] = loadunicornhybridblack(fullfilename, varargin)
         % Neurscan STIM2 Data is stored with the same file type as the  EEG data in Curry 6 & 7 which is problematic
         % Check for PsychoPy .PSYDAT file
         % 'Trial','Event','Duration','ISI','ITI','Type','Resp','Correct','Latency','ClockLatency','Trigger','MinRespWin','MaxRespWin','Stimulus'
-        AltFile = [file '.psydat'];
         try
-            if ~strcmpi(r.AltFile, 'False')
-                AltFile = r.AltFile;
+            AltFile = [file '.psydat'];
+            try
+                if ~strcmpi(r.AltFile, 'False')
+                    AltFile = r.AltFile;
+                end
+            catch
+                boolerr = 1;
+            end
+            if ~(exist(AltFile, 'file') == 0) 
+
+                fid = fopen(AltFile,'rt');
+                if (fid ~= -1)
+                    cell = textscan(fid,'%s');
+                    fclose(fid);
+                    cont = cell{1};
+
+                    % Check file version
+                    if strcmpi(cont(1,1),'gentask.....=') % Could be Neuroscan Stim2 or modified Psychopy formats
+                        if strcmpi(cont(2,1),'PsychoPy_Engine_3')
+                            EEG = importengine3psychopy(EEG, AltFile, 'Force', r.Force, 'Skip', skipcodes);
+                        end
+                    end
+                end
             end
         catch
             boolerr = 1;
         end
-        if ~(exist(AltFile, 'file') == 0) 
-
-            fid = fopen(AltFile,'rt');
-            if (fid ~= -1)
-                cell = textscan(fid,'%s');
-                fclose(fid);
-                cont = cell{1};
-
-                % Check file version
-                if strcmpi(cont(1,1),'gentask.....=') % Could be Neuroscan Stim2 or modified Psychopy formats
-                    if strcmpi(cont(2,1),'PsychoPy_Engine_3')
-                        EEG = importengine3psychopy(EEG, AltFile, 'Force', r.Force, 'Skip', skipcodes);
-                    end
-                end
-            end
-        end
-        
         
         EEG = eeg_checkset(EEG);
         EEG.history = sprintf('%s\nEEG = eeg_checkset(EEG);', EEG.history);
+        
         
     end
 end
