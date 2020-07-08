@@ -47,6 +47,10 @@ class UnicornBlackCheckSignal():
         self.nbchan = 8
         self.freqratio = []
         self.pointstd = []
+        self.filtereddata = []
+        self.psddata = []
+        self.psdclean = []
+        self.freqdata = []
         self._samplefreq = 250.0
         self.highpassfilter = 0.1
         self.lowpassfilter = 20
@@ -55,15 +59,26 @@ class UnicornBlackCheckSignal():
         self.controlband = [20, 40]
         self.noiseband = [58, 62]
         self.data = []
+        self.psdonfiltereddata = True
         
     def check(self):
         self.freqratio = []
         self.pointstd = []
+        self.filtereddata = []
+        self.psddata = []
+        self.psdclean = []
+        self.freqdata = []
         #start = time.perf_counter()
         for cP in range(self.nbchan):
-            signalnoiseratio, signalvariability = UnicornGroomQuality(self.data[:,cP], self.controlband, self.noiseband, self._samplefreq, self.scale, self.highpassfilter, self.lowpassfilter, self.notchfilter)
+            signalnoiseratio, signalvariability, datavector, _power, _freqs = UnicornGroomQuality(self.data[:,cP], self.controlband, self.noiseband, self._samplefreq, self.scale, self.highpassfilter, self.lowpassfilter, self.notchfilter)
             self.freqratio.append(signalnoiseratio)
             self.pointstd.append(signalvariability)
+            self.filtereddata.append(datavector)
+            self.psddata.append(_power)
+            self.freqdata.append(_freqs)
+            if self.psdonfiltereddata:
+                _power, _freqs = UnicornGroomPSD(datavector, self._samplefreq, self.scale)
+                self.psdclean.append(_power)
             #print('channel %d noise ratio: %0.2f' % (cP, signalnoiseratio))
             #print('channel %d variance: %0.2f' % (cP, signalvariability))
         #finish = time.perf_counter()
@@ -86,21 +101,36 @@ def UnicornGroomPSD(datavector, samplefreq=250.0, scale=500):
 def UnicornGroomFilter(datavector, highpassfilter=0.1, lowpassfilter=20.0, notchfilter=60.0, samplefreq=250.0):
     #print('UnicornGroomFilter: called')
     # function to return filtered data
-    bhp, ahp = scipy.signal.butter(2, (highpassfilter / (samplefreq / 2)), btype='high')
-    blp, alp = scipy.signal.butter(2, (lowpassfilter / (samplefreq / 2)))
-    _hpfiltersettings = [bhp, ahp]
-    _lpfiltersettings = [blp, alp]
-    b, a = scipy.signal.iirnotch(notchfilter, 30.0, samplefreq) # Design notch filter
-    _notchfiltersettings = [b, a]
-    
+        
     # Apply notch filter
-    datavector = scipy.signal.filtfilt(b=_notchfiltersettings[0], a=_notchfiltersettings[1], x=datavector, padtype='constant', padlen=int(math.floor(len(datavector)/3.0)), method="pad") 
+    if not (float(notchfilter) == float(0.0)):
+        b, a = scipy.signal.iirnotch(notchfilter, 30.0, samplefreq) # Design notch filter
+        datavector = scipy.signal.filtfilt(b=b, a=a, x=datavector, padtype='constant', padlen=int(math.floor(len(datavector)/3.0)), method="pad") 
     
-    # High pass
-    datavector = scipy.signal.filtfilt(b=_hpfiltersettings[0], a=_hpfiltersettings[1], x=datavector, padtype='constant', padlen=int(math.floor(len(datavector)/3.0)), method="pad") 
-                  
-    # low pass
-    datavector = scipy.signal.filtfilt(b=_lpfiltersettings[0], a=_lpfiltersettings[1], x=datavector, padtype='constant', padlen=int(math.floor(len(datavector)/3.0)), method="pad") 
+    continuefilt = False
+    if not (float(highpassfilter) == float(0.0)):
+        if not (float(lowpassfilter) == float(0.0)):
+            # band pass
+            b, a = scipy.signal.iirfilter(3, [highpassfilter, lowpassfilter], btype='bandpass', ftype='butter', fs=samplefreq, output='ba')
+            #sos = scipy.signal.iirfilter(3, [highpassfilter, lowpassfilter], btype='bandpass', ftype='butter', fs=samplefreq, output='sos')
+            continuefilt = True
+        else:
+            # high pass
+            b, a = scipy.signal.iirfilter(3, highpassfilter, btype='highpass', ftype='butter', fs=samplefreq, output='ba')
+            #sos = scipy.signal.iirfilter(3, highpassfilter, btype='highpass', ftype='butter', fs=samplefreq, output='sos')
+            continuefilt = True
+    elif not (float(lowpassfilter) == float(0.0)):
+        # low pass
+        b, a = scipy.signal.iirfilter(3, lowpassfilter, btype='lowpass', ftype='butter', fs=samplefreq, output='ba')
+        #sos = scipy.signal.iirfilter(3, lowpassfilter, btype='lowpass', ftype='butter', fs=samplefreq, output='sos')
+        continuefilt = True
+    
+    if continuefilt:     
+        #datavector = scipy.signal.filtfilt(b=b, a=a, x=datavector, padtype='constant', padlen=int(math.floor(len(datavector)/3.0)), method="pad") 
+        datavector = scipy.signal.filtfilt(b=b, a=a, x=datavector, padtype=None) 
+        #datavector = scipy.signal.sosfilt(sos, datavector)    
+        
+    
     
     return datavector
     #print('UnicornGroomFilter: complete')
@@ -122,9 +152,11 @@ def UnicornGroomQuality(datavector, controlband, noiseband, samplefreq, scale, h
     signalnoiseratio = numpy.around(numpy.divide(noisepower, controlpower), decimals=1) # frequency ratio
                          
     datavector = UnicornGroomFilter(datavector, highpassfilter=highpassfilter, lowpassfilter=lowpassfilter, notchfilter=notchfilter, samplefreq=samplefreq)
-    signalvariability = numpy.std(datavector)
     
-    return signalnoiseratio, signalvariability
+    checkspan = int(math.floor((len(datavector) / 5.0))) * -1
+    signalvariability = numpy.std(datavector[checkspan:-1])
+    
+    return signalnoiseratio, signalvariability, datavector, _power, _freqs
 
 
 
@@ -242,7 +274,8 @@ class UnicornBlackProcess():
             powerlevel = int(_plottingdata[-1,-3]) # update power level
         except:
             powerlevel = 0
-        print('Device battery at %d percent.' % powerlevel)
+        if self.printoutput:
+            print('Device battery at %d percent.' % powerlevel)
         return powerlevel
 
 class UnicornBlackThreads():    
