@@ -339,57 +339,67 @@ class Viewer():
         
     def update(self, *args):
         
-        _plottingdata = numpy.array(self.UnicornBlack.sample_data(), copy=True)
-        
-        self.datacheck.data = _plottingdata
-        self.datacheck.check()
-        
-        # pull data and trim
-        self.batterylabel.set_text('Battery: %d%%' % int(_plottingdata[-1,-3]))
-        _plottingdata = numpy.array(self.datacheck.filtereddata, copy=True)
-        if not (float(self.trimspan) == float(0)):
-            _plottingdata = _plottingdata[:,self._trimspantrailpoints:-self._trimspanleadpoints]
-            
-            
-        _plottingdata[0:8,:] = numpy.flipud(_plottingdata[0:8,:])
-        _plottingdata = self._computedataoffset(_plottingdata)
-        
-        # manage frequency data
-        _freqdatanoise = numpy.array(self.datacheck.psddata, copy=True)
-        _freqdata = numpy.array(self.datacheck.psdclean, copy=True)
-        # remove frequency bands not of interest - swap noise measure in
-        _freqdata[:,self.switchsegs[0]:self.switchsegs[1]] = _freqdatanoise[:,self.switchsegs[2]:self.switchsegs[3]]
-        
-        _freqdata[0:8,:] = numpy.flipud(_freqdata[0:8,:])
-        _freqdata = self._computefreqoffset(_freqdata)
-        self.freqax.collections.clear()
-        self.freqfillbetween = []
-        
         threspoints = [0.001, 0.05, 0.1, 1]
+        boolcont = True
+        try:
+            _plottingdata = numpy.array(self.UnicornBlack.sample_data(), copy=True)
+        except:
+            boolcont = False
         
-        # loop through each channel
-        for cP in range(self.numberOfAcquiredChannels):
-            
-            datavector = _plottingdata[:,cP]
-            pstd = self.norm(self.datacheck.pointstd[cP])
-            if (pstd < threspoints[0]):
-                newtexture = self.greatchannel
-            elif ((pstd >= threspoints[0]) and (pstd < threspoints[1])):
-                newtexture = self.goodchannel
-            elif ((pstd >= threspoints[1]) and (pstd < threspoints[2])):
-                newtexture = self.almostchannel
-            elif ((pstd >= threspoints[2]) and (pstd < threspoints[3])):
-                newtexture = self.gettingtherechannel
-            else:
-                newtexture = self.badchannel
-            self.chanlables[self.numberOfAcquiredChannels-1-cP].set_bbox(dict(facecolor=newtexture, edgecolor=newtexture, boxstyle='square,pad=1.83'))
-            self.lines[cP].set_ydata(datavector)
-            self.freqlines[cP].set_ydata(_freqdata[:,cP])
-            self.freqfillbetween.append(self.freqax.fill_between(self.freqxline, y1=_freqdata[:,cP], y2=[self.freqoffset[cP]] * len(_freqdata[:,cP]), facecolor =self.colorpalet[cP], alpha=0.5))
-                     
+        if boolcont:
+            try:
+                self.datacheck.data = _plottingdata
+                self.datacheck.check()
+                
+                # pull data and trim
+                self.batterylabel.set_text('Battery: %d%%' % int(_plottingdata[-1,-3]))
+                _plottingdata = numpy.array(self.datacheck.filtereddata, copy=True)
+                if not (float(self.trimspan) == float(0)):
+                    _plottingdata = _plottingdata[:,self._trimspantrailpoints:-self._trimspanleadpoints]
+                    
+                    
+                _plottingdata[0:8,:] = numpy.flipud(_plottingdata[0:8,:])
+                _plottingdata = self._computedataoffset(_plottingdata)
+                
+                # manage frequency data
+                _freqdatanoise = numpy.array(self.datacheck.psddata, copy=True)
+                _freqdata = numpy.array(self.datacheck.psdclean, copy=True)
+                # remove frequency bands not of interest - swap noise measure in
+                _freqdata[:,self.switchsegs[0]:self.switchsegs[1]] = _freqdatanoise[:,self.switchsegs[2]:self.switchsegs[3]]
+                
+                _freqdata[0:8,:] = numpy.flipud(_freqdata[0:8,:])
+                _freqdata = self._computefreqoffset(_freqdata)
+                self.freqax.collections.clear()
+                self.freqfillbetween = []
+            except:
+                boolcont = False
+                
+            if boolcont:
+                # loop through each channel
+                for cP in range(self.numberOfAcquiredChannels):
+                    try:
+                        datavector = _plottingdata[:,cP]
+                        pstd = self.norm(self.datacheck.pointstd[cP])
+                        if (pstd < threspoints[0]):
+                            newtexture = self.greatchannel
+                        elif ((pstd >= threspoints[0]) and (pstd < threspoints[1])):
+                            newtexture = self.goodchannel
+                        elif ((pstd >= threspoints[1]) and (pstd < threspoints[2])):
+                            newtexture = self.almostchannel
+                        elif ((pstd >= threspoints[2]) and (pstd < threspoints[3])):
+                            newtexture = self.gettingtherechannel
+                        else:
+                            newtexture = self.badchannel
+                        self.chanlables[self.numberOfAcquiredChannels-1-cP].set_bbox(dict(facecolor=newtexture, edgecolor=newtexture, boxstyle='square,pad=1.83'))
+                        self.lines[cP].set_ydata(datavector)
+                        self.freqlines[cP].set_ydata(_freqdata[:,cP])
+                        self.freqfillbetween.append(self.freqax.fill_between(self.freqxline, y1=_freqdata[:,cP], y2=[self.freqoffset[cP]] * len(_freqdata[:,cP]), facecolor =self.colorpalet[cP], alpha=0.5))
+                    except:
+                        pass
+                
         return self.batterylabel, self.chanlables[0], self.chanlables[1], self.chanlables[2], self.chanlables[3], self.chanlables[4], self.chanlables[5], self.chanlables[6], self.chanlables[7], self.lines[0], self.lines[1], self.lines[2], self.lines[3], self.lines[4], self.lines[5], self.lines[6], self.lines[7]
-        
-        
+            
+            
 
 
 if __name__ == '__main__':
