@@ -186,14 +186,7 @@ function [EEG, command] = loadunicornhybridblack(fullfilename, varargin)
         % Check for PsychoPy .PSYDAT file
         % 'Trial','Event','Duration','ISI','ITI','Type','Resp','Correct','Latency','ClockLatency','Trigger','MinRespWin','MaxRespWin','Stimulus'
         try
-            AltFile = [file '.psydat'];
-            try
-                if ~strcmpi(r.AltFile, 'False')
-                    AltFile = r.AltFile;
-                end
-            catch
-                boolerr = 1;
-            end
+            AltFile = [pathstr, filesep, name, '.psydat'];
             if ~(exist(AltFile, 'file') == 0) 
 
                 fid = fopen(AltFile,'rt');
@@ -205,7 +198,7 @@ function [EEG, command] = loadunicornhybridblack(fullfilename, varargin)
                     % Check file version
                     if strcmpi(cont(1,1),'gentask.....=') % Could be Neuroscan Stim2 or modified Psychopy formats
                         if strcmpi(cont(2,1),'PsychoPy_Engine_3')
-                            EEG = importengine3psychopy(EEG, AltFile, 'Force', r.Force, 'Skip', skipcodes);
+                            EEG = importengine3psychopy(EEG, AltFile);
                         end
                     end
                 end
