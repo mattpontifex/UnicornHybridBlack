@@ -49,6 +49,7 @@ of the signal. This file is located within:
 
 'Python Collect' -> 'Gentask' -> 'Engine' and is labeled 'unicornhybridblackviewer.py'.  
 
+<p align="center"><img src="/screencaps/screencap_UnicornViewer.png?raw=true" width="300" alt="screencap Unicorn Viewer"></p>
 
 Psychopy integration
 ------------
