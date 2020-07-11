@@ -130,8 +130,6 @@ def UnicornGroomFilter(datavector, highpassfilter=0.1, lowpassfilter=20.0, notch
         datavector = scipy.signal.filtfilt(b=b, a=a, x=datavector, padtype=None) 
         #datavector = scipy.signal.sosfilt(sos, datavector)    
         
-    
-    
     return datavector
     #print('UnicornGroomFilter: complete')
 
@@ -262,7 +260,7 @@ class UnicornBlackProcess():
         
     def sample_data(self):
         self.pulleegdata.set() # tell process to obtain a sample
-        data = self.pulleegdata1.recv()
+        data = self.pulleegdata1.recv() # takes about 20 ms
         #tempdata = numpy.array(data)
         #print('UnicornBlackProcess: Battery at %0.1f percent' % tempdata[-1,-3])
         return data
@@ -295,8 +293,6 @@ class UnicornBlackThreads():
         self._queuelock = Lock()
         self._logsamplequeue = Queue()
         self._logeventqueue = Queue()
-        self._lock = Lock()
-        self._datalock = Lock()
         self._bufferlock = Lock()
         self._loglock = Lock()
         self._logeventlock = Lock()

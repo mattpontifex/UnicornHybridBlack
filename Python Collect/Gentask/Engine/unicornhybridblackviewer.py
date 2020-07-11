@@ -9,6 +9,8 @@ Working notes
 
 import math
 import numpy
+import time
+from threading import Thread, Lock
 import matplotlib
 import matplotlib.pyplot
 import matplotlib.animation
@@ -30,7 +32,8 @@ class Viewer():
     def __init__(self):
         
         self.samplefreq = 250.0
-        self.timeplotscale = 4
+        self.timeplotscale = 4.475
+        self.computedscale = 0
         self.timeplotoffsetscale = 2000
         self.freqplotscale = 0.005
         self.numberOfAcquiredChannels = 8
@@ -38,10 +41,15 @@ class Viewer():
         self.trimspanlead = 0.5
         self.trimspantrail = 2.0
         self.channellabels = ['FZ', 'C3', 'CZ', 'C4', 'PZ', 'O1', 'OZ', 'O2']
-        self.updatetime = 180 # update every x ms
+        self.updatetime = 200 # update every x ms
+        self.updatetimelog = []
 
         self._linewidth = 0.5
         self._data = []
+        self.datamatrixforplotting = []
+        self._datamatrixforplottinglock = Lock()
+        self.frequencymatrixforplotting = []
+        self._frequencymatrixforplottinglock = Lock()
         
         self.lowpassfilter = 26.0
         self.highpassfilter = 1.0
@@ -114,8 +122,8 @@ class Viewer():
         while not self.UnicornBlack.ready:
             continueExperiment = False
             
-        powerlevel = self.UnicornBlack.check_battery()
-        if (powerlevel == 0):
+        self.powerlevel = self.UnicornBlack.check_battery()
+        if (self.powerlevel == 0):
             print('The Unicorn is out of battery charge.')
         
         
@@ -189,10 +197,10 @@ class Viewer():
         self.devicelabel = self.fig.text(0.03, 0.983, 'Device: unknown', horizontalalignment='left', verticalalignment='top', weight='medium', size=self.DeviceLabelSize, color=self.DeviceLabelColor)
         self.batterylabel = self.fig.text(0.97, 0.983, 'Battery: unknown', horizontalalignment='right', verticalalignment='top', weight='medium', size=self.DeviceLabelSize, color=self.DeviceLabelColor)
         self.devicelabel.set_text('Device: %s' % self.UnicornBlack.deviceID)
-        self.batterylabel.set_text('Battery: %d%%' % int(powerlevel))
+        self.batterylabel.set_text('Battery: %d%%' % int(self.powerlevel))
         
         # Add buttons
-        self.timescalelabel = self.fig.text(0.685, 0.07, '1x scaling', horizontalalignment='right', verticalalignment='bottom', weight='medium', size=self.AxisFontSize, color=self.DeviceLabelColor)
+        self.timescalelabel = self.fig.text(0.685, 0.07, '1 microvolt', horizontalalignment='right', verticalalignment='bottom', weight='medium', size=self.AxisFontSize, color=self.DeviceLabelColor)
         
         self.eegscaleupbutton = Button(matplotlib.pyplot.axes([0.405, 0.005, 0.12, 0.03]), 'scale up', color=self.ButtonFaceColor, hovercolor=self.ButtonHoverColor)  #xpos, ypos, xsize, ysize
         self.eegscaleupbutton.label.set_fontsize(self.ButtonLabelSize)
@@ -229,7 +237,7 @@ class Viewer():
             self.lines.append(line)
             self.offset.append(((cC + 1)*(self.timeplotoffsetscale+240)) - 1000)
             self.freqoffset.append(((cC + 1)*(self.timeplotoffsetscale+240)) - 2000)
-        
+        self.computedscale = ((self.offset[1]-self.offset[0]) / self.timeplotscale)
         
         # Prep data checks
         self.datacheck = unicornhybridblack.UnicornBlackCheckSignal()
@@ -255,7 +263,11 @@ class Viewer():
             line, = self.freqax.plot(self.freqxline, self.datacheck.psddata[cC], linewidth=0.4, color=self.colorpalet[cC]) 
             self.freqlines.append(line)
             
-        
+        # start sampler
+        #self._sampling = True
+        #self._sthread = Thread(target=self.updatesamples, args=[], daemon=False)
+        #self._sthread.name = 'samplestreamer'
+        #self._sthread.start()
         
     def eegscaleupbutton_clk(self, *args): 
         tempvalue = self.timeplotscale * 2.0
@@ -282,25 +294,27 @@ class Viewer():
             
     def updatescale(self):
         # update scale
-        textscale = self.timeplotscale
-        textscaleunits = 'x scaling'
+        self.computedscale = ((self.offset[1]-self.offset[0]) / self.timeplotscale)
+        textscale = self.computedscale
+        
+        textscaleunits = 'microvolts'
         if (textscale > 1000):
-            textscaleunits = 'kx scaling'
+            textscaleunits = 'millivolts'
             textscale = textscale/1000
             if (textscale > 1000):
-                textscaleunits = 'mx scaling'
+                textscaleunits = 'volts'
                 textscale = textscale/1000
         elif (textscale < 1000):
             if (textscale < 1):
-                textscaleunits = 'milx scaling'
+                textscaleunits = 'nanovolts'
                 textscale = textscale*1000
                 if (textscale < 1):
-                    textscaleunits = 'px scaling'
+                    textscaleunits = 'picovolts'
                     textscale = textscale*1000
                    
-        
-        self.timescalelabel.set_text('%d%s' % (int(textscale),textscaleunits))
+        self.timescalelabel.set_text('%d %s' % (int(textscale),textscaleunits))
         self.fig.canvas.draw_idle()
+        #print(numpy.median(self.updatetimelog))
         
         
     def _computedataoffset(self, source):
@@ -322,14 +336,11 @@ class Viewer():
         print('Initializing Unicorn Hybrid Black Data Viewer...')
         self.prep()
         self.updatescale()
+        
+        print('Close window to disconnect...')
         ani = matplotlib.animation.FuncAnimation(self.fig, self.update, interval=self.updatetime, blit=False)
         matplotlib.pyplot.show()
         
-        try:
-            self.UnicornBlack.disconnect()
-        except:
-            bolerr = 1
-
     def handle_close(self, evt, *args):
         #print('Shutting down data viewer...')
         #matplotlib.pyplot.close()
@@ -340,67 +351,99 @@ class Viewer():
     def update(self, *args):
         
         threspoints = [0.001, 0.05, 0.1, 1]
+        self.freqax.collections.clear()
+        self.freqfillbetween = []
+
+        self.updatesamples()
+        
+        boolcont = True
+        try:
+            self.batterylabel.set_text('Battery: %d%%' % self.powerlevel)
+        except:
+            boolcont = False
+            
+        if boolcont:
+            # takes about 8 ms to update all the channels info
+            
+            # loop through each channel
+            for cP in range(self.numberOfAcquiredChannels):
+                try:
+                    datavector = self.datamatrixforplotting[:,cP]
+                    pstd = self.norm(self.datacheck.pointstd[cP])
+                    if (pstd < threspoints[0]):
+                        newtexture = self.greatchannel
+                    elif ((pstd >= threspoints[0]) and (pstd < threspoints[1])):
+                        newtexture = self.goodchannel
+                    elif ((pstd >= threspoints[1]) and (pstd < threspoints[2])):
+                        newtexture = self.almostchannel
+                    elif ((pstd >= threspoints[2]) and (pstd < threspoints[3])):
+                        newtexture = self.gettingtherechannel
+                    else:
+                        newtexture = self.badchannel
+                    self.chanlables[self.numberOfAcquiredChannels-1-cP].set_bbox(dict(facecolor=newtexture, edgecolor=newtexture, boxstyle='square,pad=1.83'))
+                except:
+                    #print('error in time plot')
+                    pass                    
+                try:
+                    self.lines[cP].set_ydata(datavector)
+                    self.freqlines[cP].set_ydata(self.frequencymatrixforplotting[:,cP])
+                    self.freqfillbetween.append(self.freqax.fill_between(self.freqxline, y1=self.frequencymatrixforplotting[:,cP], y2=[self.freqoffset[cP]] * len(self.frequencymatrixforplotting[:,cP]), facecolor =self.colorpalet[cP], alpha=0.5))
+                except:
+                    #print('error in freq plot')
+                    pass  
+            
+        return self.batterylabel, self.chanlables[0], self.chanlables[1], self.chanlables[2], self.chanlables[3], self.chanlables[4], self.chanlables[5], self.chanlables[6], self.chanlables[7], self.lines[0], self.lines[1], self.lines[2], self.lines[3], self.lines[4], self.lines[5], self.lines[6], self.lines[7]
+            
+    def updatesamples(self):
+        # this whole function takes about 60 ms to complete
+        # it takes about 50 ms to pull the data
+        # it takes about 15 ms to filter the data and compute the PSD
+        # the rest is all pretty fast
+        
+        #while self._sampling:
+            
+        #t = time.perf_counter()
+        
         boolcont = True
         try:
             _plottingdata = numpy.array(self.UnicornBlack.sample_data(), copy=True)
         except:
             boolcont = False
         
-        if boolcont:
+        if boolcont:    
             try:
+                self.powerlevel = int(_plottingdata[-1,-3])
+            
+               
                 self.datacheck.data = _plottingdata
                 self.datacheck.check()
                 
-                # pull data and trim
-                self.batterylabel.set_text('Battery: %d%%' % int(_plottingdata[-1,-3]))
                 _plottingdata = numpy.array(self.datacheck.filtereddata, copy=True)
                 if not (float(self.trimspan) == float(0)):
                     _plottingdata = _plottingdata[:,self._trimspantrailpoints:-self._trimspanleadpoints]
                     
-                    
                 _plottingdata[0:8,:] = numpy.flipud(_plottingdata[0:8,:])
                 _plottingdata = self._computedataoffset(_plottingdata)
+
+                self.datamatrixforplotting = _plottingdata[:]
                 
                 # manage frequency data
                 _freqdatanoise = numpy.array(self.datacheck.psddata, copy=True)
                 _freqdata = numpy.array(self.datacheck.psdclean, copy=True)
                 # remove frequency bands not of interest - swap noise measure in
                 _freqdata[:,self.switchsegs[0]:self.switchsegs[1]] = _freqdatanoise[:,self.switchsegs[2]:self.switchsegs[3]]
-                
                 _freqdata[0:8,:] = numpy.flipud(_freqdata[0:8,:])
                 _freqdata = self._computefreqoffset(_freqdata)
-                self.freqax.collections.clear()
-                self.freqfillbetween = []
+                
+                self.frequencymatrixforplotting = _freqdata[:]
+                
             except:
                 boolcont = False
-                
-            if boolcont:
-                # loop through each channel
-                for cP in range(self.numberOfAcquiredChannels):
-                    try:
-                        datavector = _plottingdata[:,cP]
-                        pstd = self.norm(self.datacheck.pointstd[cP])
-                        if (pstd < threspoints[0]):
-                            newtexture = self.greatchannel
-                        elif ((pstd >= threspoints[0]) and (pstd < threspoints[1])):
-                            newtexture = self.goodchannel
-                        elif ((pstd >= threspoints[1]) and (pstd < threspoints[2])):
-                            newtexture = self.almostchannel
-                        elif ((pstd >= threspoints[2]) and (pstd < threspoints[3])):
-                            newtexture = self.gettingtherechannel
-                        else:
-                            newtexture = self.badchannel
-                        self.chanlables[self.numberOfAcquiredChannels-1-cP].set_bbox(dict(facecolor=newtexture, edgecolor=newtexture, boxstyle='square,pad=1.83'))
-                        self.lines[cP].set_ydata(datavector)
-                        self.freqlines[cP].set_ydata(_freqdata[:,cP])
-                        self.freqfillbetween.append(self.freqax.fill_between(self.freqxline, y1=_freqdata[:,cP], y2=[self.freqoffset[cP]] * len(_freqdata[:,cP]), facecolor =self.colorpalet[cP], alpha=0.5))
-                    except:
-                        pass
-                
-        return self.batterylabel, self.chanlables[0], self.chanlables[1], self.chanlables[2], self.chanlables[3], self.chanlables[4], self.chanlables[5], self.chanlables[6], self.chanlables[7], self.lines[0], self.lines[1], self.lines[2], self.lines[3], self.lines[4], self.lines[5], self.lines[6], self.lines[7]
+        
+        
+        #elapsed_time = time.perf_counter() - t
+        #self.updatetimelog.append(elapsed_time)
             
-            
-
 
 if __name__ == '__main__':
     task = Viewer()
