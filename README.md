@@ -26,17 +26,17 @@ UnicornBlackProcess provides the ability to run the device using multiprocessing
 background collecting data. 
 
     UnicornBlack = unicornhybridblack.UnicornBlackProcess() 
-    UnicornBlack.connect(deviceID='UN-20XX.0X.XX' , rollingspan=3.0, logfilename='default')
+    UnicornBlack.connect(deviceID='UN-20XX.0X.XX', rollingspan=3.0, logfilename='default')
     print('Battery: %0.1f%%' % UnicornBlack.check_battery())
     UnicornBlack.startrecording()
     UnicornBlack.mark_event(5) 
     UnicornBlack.disconnect()
     
 
-UnicornBlackThreads provides direct access to the thread functions.
+UnicornBlackThreads provides direct access to the thread and retains the same core commands.
   
     UnicornBlack = unicornhybridblack.UnicornBlackThreads()
-    UnicornBlack.connect(deviceID='UN-20XX.0X.XX' , rollingspan=3.0, logfilename='default')
+    UnicornBlack.connect(deviceID='UN-20XX.0X.XX', rollingspan=3.0, logfilename='default')
     print('Battery: %0.1f%%' % UnicornBlack.check_battery())
     UnicornBlack.startrecording()
     UnicornBlack.mark_event(5)
