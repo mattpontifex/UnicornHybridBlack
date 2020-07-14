@@ -9,5 +9,5 @@ if __name__ == "__main__":
     task = Viewer()
     task.channellabels = ['FCZ', 'CP1', 'CPZ', 'CP2', 'P1', 'PZ', 'P2', 'OZ']
     task.unicorn = 'UN-2019.05.51' 
-    task.updatetime = 180 # make larger if app starts hanging
+    task.updatetime = 220 # make larger if app starts hanging
     task.run()
