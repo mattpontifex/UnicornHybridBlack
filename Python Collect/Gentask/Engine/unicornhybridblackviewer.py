@@ -101,7 +101,7 @@ class Viewer():
         
         self.trimspan = self.trimspanlead + self.trimspantrail
         
-        self.norm = matplotlib.colors.Normalize(vmin=500, vmax=4000.0)
+        #self.norm = matplotlib.colors.Normalize(vmin=500, vmax=4000.0)
         cm_subsection = numpy.linspace(0.0, 1.0, int(self.numberOfAcquiredChannels*1.5)) 
         self.colorpalet = [ matplotlib.pyplot.cm.viridis(x) for x in cm_subsection ]
         
@@ -350,7 +350,7 @@ class Viewer():
         
     def update(self, *args):
         
-        threspoints = [0.001, 0.05, 0.1, 1]
+        threspoints = [12, 16, 30, 60]
         self.freqax.collections.clear()
         self.freqfillbetween = []
 
@@ -369,7 +369,7 @@ class Viewer():
             for cP in range(self.numberOfAcquiredChannels):
                 try:
                     datavector = self.datamatrixforplotting[:,cP]
-                    pstd = self.norm(self.datacheck.pointstd[cP])
+                    pstd = self.datacheck.pointstd[cP]
                     if (pstd < threspoints[0]):
                         newtexture = self.greatchannel
                     elif ((pstd >= threspoints[0]) and (pstd < threspoints[1])):

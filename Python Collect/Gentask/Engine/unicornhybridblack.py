@@ -259,8 +259,10 @@ class UnicornBlackProcess():
             self.safetologevent.clear()
         
     def sample_data(self):
+        #t = time.perf_counter()
         self.pulleegdata.set() # tell process to obtain a sample
         data = self.pulleegdata1.recv() # takes about 20 ms
+        #print(time.perf_counter() - t)
         #tempdata = numpy.array(data)
         #print('UnicornBlackProcess: Battery at %0.1f percent' % tempdata[-1,-3])
         return data
@@ -317,6 +319,7 @@ class UnicornBlackThreads():
         self.lastsampledpoint = None
         self.data = None
         self.printoutput = True
+        self.ready = True
         
     
     def connect(self, deviceID=None, rollingspan=3.0, logfilename='default'):
