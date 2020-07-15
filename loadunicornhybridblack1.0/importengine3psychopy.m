@@ -25,6 +25,7 @@ function [ EEG ] = importengine3psychopy(EEG, filin, varargin)
     try, r.Skip;  skipcodes = [r.Skip];    catch, skipcodes = []; end
     try, r.Check;  validateresponses = r(1).Check;    catch, validateresponses= 'True'; end
     try, r.Debug; catch r.Debug = 'False'; end
+    try, r.Threshold; catch r.Threshold = (16.67 * 2); end % 2 frames (16.7) difference between response and response trigger
 
     if ~(exist(filin, 'file') == 0) 
         fid = fopen(filin,'rt');
@@ -212,7 +213,6 @@ function [ EEG ] = importengine3psychopy(EEG, filin, varargin)
                             samprate = (1/EEG.srate)*1000;
                             is = zeros(1,5);
                             isthres = 25;
-                            hitthres = 33; % 2 frames (16.7) difference between response and response trigger
                             for rC = 1:size(EEG.event,2)
                                 tindex = 1;
                                 if strcmpi(EEG.event(rC).stimresp, 'Stimulus')
@@ -222,7 +222,7 @@ function [ EEG ] = importengine3psychopy(EEG, filin, varargin)
                                                 if (EEG.event(rC+1).type == EEG.event(rC).respcode)
                                                     tempa = (EEG.event(rC+1).latency - EEG.event(rC).latency)*samprate;
                                                     EEG.event(rC).('offby') = (tempa-EEG.event(rC).resplatency); 
-                                                    if (abs(tempa-EEG.event(rC).resplatency) > hitthres)
+                                                    if (abs(tempa-EEG.event(rC).resplatency) > r.Threshold)
                                                         if ~(EEG.event(rC).respcorr < 0)
                                                             is(1) = is(1) + 1; %difference between response event and when the stimulus says the response occured is outside of the specified latency threshold
                                                         end
@@ -249,7 +249,6 @@ function [ EEG ] = importengine3psychopy(EEG, filin, varargin)
                             end
 
                             % Check clock drift
-                            hitthres = 30; % 10ms drift
                             temp = find(strcmpi([EEG.event.stimresp],'Stimulus'));
                             for rC = 2:size(temp,2)
                                 if (strcmpi(EEG.event(temp(rC-1)).stimresp, 'Stimulus'))
@@ -257,7 +256,7 @@ function [ EEG ] = importengine3psychopy(EEG, filin, varargin)
                                         markgap = (EEG.event(temp(rC)).latency-EEG.event(temp(rC-1)).latency)*samprate;
                                         stimgap = round(EEG.event(temp(rC)).masterclocklatency - EEG.event(temp(rC-1)).masterclocklatency,0);
                                         EEG.event(temp(rC)).('clockoffby') = markgap-stimgap;
-                                        if (abs(markgap-stimgap) > hitthres)
+                                        if (abs(markgap-stimgap) > r.Threshold)
                                             is(5) = is(5) + 1; %The latency between stimuli does not match between the events and the stimuli clock.
                                         end
                                     end
