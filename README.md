@@ -4,7 +4,7 @@ UnicornHybridBlack
 A set of EEGLAB and Python functions to interact with the g.tec Unicorn Hybrid Black (https://www.unicorn-bi.com/) 
 8 channel wireless EEG device.  
 
-<p align="center"><img src="/screencaps/UnicornBanner.png?raw=true" width="900" alt="banner Unicorn"></p>
+<p align="center"><img src="/screencaps/UnicornBanner.png?raw=true" width="500" alt="banner Unicorn"></p>
 
 It is suggested that you use Anaconda Spyder 3 with python 3.0 or higher. Spyder however does not play nicely with
 multiprocessing, so you should change the settings to have Spyder run the task in an external system terminal.   
