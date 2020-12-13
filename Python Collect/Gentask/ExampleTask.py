@@ -2,6 +2,7 @@ import os
 import Engine.xcat as xcat
 import Engine.filesync as filesync
 from Engine.basicstimuluspresentationengine import Engine
+import Engine.eegpipe as eegpipe
 
 if __name__ == "__main__":
     # Unicorn multiprocessing will not run in Spyder 
@@ -70,6 +71,19 @@ if __name__ == "__main__":
     taskoutput.show(label = 'Cong')
     taskoutput.run(inputfile = task.outputfile, trialtypes = [25, 26])
     taskoutput.show(label = 'Inco')
+    
+    # Rapid Process EEG
+    EEG = eeg.pipe.readUnicornBlack(task.outputfile)
+    EEG = simplefilter(EEG, Filter = 'Notch', Cutoff = [60.0])
+    EEG = simplefilter(EEG, Filter = 'Bandpass', Design = 'Butter', Cutoff = [1.0, 25.0], Order=3)
+    EEG = simpleepoch(EEG, Window = [-500.0, 1000.0], Types = [23, 24, 25, 26, 33, 34, 35, 36])
+    EEG = simplebaselinecorrect(EEG, Window = [-100.0, 0.0])
+    EEG = voltagethreshold(EEG, Threshold = [-100.0, 100.0], Step = 50.0)
+    EEG = simplepsd(EEG, Scale = 500, Ceiling = 30.0)
+    EEG = simplefilter(EEG, Design = 'savitzky-golay', Order = 4)
+    EEG = simplezwave(EEG, BaselineWindow = [-500.0, 0.0])
+    EEG = simpleaverage(EEG, Approach = 'Mean', BaselineWindow = [-100, 0])
+    saveset(EEG, task.outputfile)
     
     # Backup data
     #filesync.pushfiles(inpath = '\\Studies\Raw', outpath = 'Z:\Studies\Raw', file_types = ['.psydat', '.tsv', '.tsve', '.csv', '.csve'])
