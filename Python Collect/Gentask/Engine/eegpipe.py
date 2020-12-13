@@ -861,63 +861,11 @@ if __name__ == "__main__":
     
     
     
-    #EEG = eeglabstructure()
+    EEG = eeglabstructure()
     
-    #EEG.srate = 250.0
+    EEG.srate = 250.0
     #for i in range(6):
     #    EEG.data.append(neurokit2.ppg_simulate(duration=10, sampling_rate=EEG.srate, heart_rate=numpy.random.randint(30,120,1)[0]))
         
     #EEG.checkset()
     
-    
-    EEG = readUnicornBlack('/Users/mattpontifex/Downloads/testdata/VEP090p.csv')
-    
-    EEG = simplefilter(EEG, Filter='Notch', Cutoff=[60.0])
-    EEG = simplefilter(EEG, Filter='Bandpass', Design='Butter', Cutoff=[1,25], Order=3)
-     
-    #EEG = simpleepoch(EEG, Window=[-500, 1000], Types=[10008])
-    #EEG = simplebaselinecorrect(EEG, Window=[-100.0, 0.0])
-    #EEG = voltagethreshold(EEG, Threshold=[-100.0, 100.0], Step=50.0)
-    #EEG = simplepsd(EEG, Scale=500, Ceiling=30.0)
-    # 
-    #EEG = simplefilter(EEG, Design='savitzky-golay', Order=4) # smoothes the shit out of the data
-    
-    #EEG = simplezwave(EEG, BaselineWindow=[-500.0, 0.0]) # amplitude in microvolts to z scored amplitude
-    
-    #EEG = simpleaverage(EEG, Approach='Mean', BaselineWindow=[-100, 0])
-    
-    
-    #plot(EEG.data,EEG.times)
-    
-    
-    #plot(EEG.freqdata,EEG.frequencies)
-    
-    #tempvect = extractamplitude(EEG, Window=[250, 600], Approach='Mean')
-    #plot([tempvect])
-    #EEG.channels
-    #plot([EEG.data[4]])
-    #plot([EEG.data[4]])
-    #plot(EEG.data)
-    
-    #saveset(EEG, '/Users/mattpontifex/Downloads/attachments/OBAva.eeg')
-    
-    #EEG = loadset('/Users/mattpontifex/Downloads/attachments/OBAva.eeg')
-    
-    
-    #tempmat = numpy.vstack(EEG.data[0])
-    #plot([tempmat.transpose()])
-    
-    # see what events are available
-    #[v for i,v in enumerate(EEG.events[0]) if v > 0]
-    
-    
-    EEG = simpleepoch(EEG, Window = [-200.0, 600.0], Types = [10005, 10006])
-    EEG = simplebaselinecorrect(EEG, Window = [-100.0, 0.0])
-    EEG = voltagethreshold(EEG, Threshold = [-100.0, 100.0], Step = 50.0)
-    EEG = simplepsd(EEG, Scale = 500, Ceiling = 30.0)
-    EEG = simplefilter(EEG, Design = 'savitzky-golay', Order = 4)
-    EEG = simplezwave(EEG, BaselineWindow = [-200.0, 0.0])
-    EEG = simpleaverage(EEG, Approach = 'Mean', BaselineWindow = [-100, 0])
-    #saveset(EEG, task.outputfile)
-    
-    plot(EEG.data,EEG.times)
