@@ -2,6 +2,7 @@ import os
 import Engine.xcat as xcat
 import Engine.filesync as filesync
 from Engine.vepengine import Engine
+import Engine.eegpipe as eegpipe
 
 #https://webvision.med.utah.edu/book/electrophysiology/visually-evoked-potentials/
 #The major component of the VEP is the large positive wave peaking at about 100 milliseconds (Fig. 5).
@@ -70,6 +71,20 @@ if __name__ == "__main__":
     taskoutput = xcat.BehavioralAnalysis()
     taskoutput.run(inputfile = task.outputfile, trialtypes = [8, 9])
     taskoutput.show(label = 'All', header = True)
+    
+    
+    # Rapid Process EEG
+    EEG = eeg.pipe.readUnicornBlack(task.outputfile)
+    EEG = simplefilter(EEG, Filter = 'Notch', Cutoff = [60.0])
+    EEG = simplefilter(EEG, Filter = 'Bandpass', Design = 'Butter', Cutoff = [1.0, 25.0], Order=3)
+    EEG = simpleepoch(EEG, Window = [-200.0, 600.0], Types = [10008, 10009])
+    EEG = simplebaselinecorrect(EEG, Window = [-100.0, 0.0])
+    EEG = voltagethreshold(EEG, Threshold = [-100.0, 100.0], Step = 50.0)
+    EEG = simplepsd(EEG, Scale = 500, Ceiling = 30.0)
+    EEG = simplefilter(EEG, Design = 'savitzky-golay', Order = 4)
+    EEG = simplezwave(EEG, BaselineWindow = [-200.0, 0.0])
+    EEG = simpleaverage(EEG, Approach = 'Mean', BaselineWindow = [-100, 0])
+    saveset(EEG, task.outputfile)
     
     # Backup data
     #filesync.pushfiles(inpath = '\\Studies\Raw', outpath = 'Z:\Studies\Raw', file_types = ['.psydat', '.tsv', '.tsve', '.csv', '.csve'])
