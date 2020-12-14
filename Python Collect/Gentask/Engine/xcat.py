@@ -2,11 +2,15 @@ import os
 import sys
 import numpy
 import codecs
-import re
 numpy.seterr(divide='ignore', invalid='ignore')
 
+
+
 def version():
-    print('xcat toolbox version 1.3, updated 2015-09-02')
+    print('xcat toolbox version 1.4, updated 2020-12-01')
+    # 1.4
+    # added scoring for reciprocal reaction time sum and average
+    # Wainer, H. (1977). Speed vs reaction time as a measure of cognitive performance. Memory & Cognition, 5(2), 278-280.     
 
 def trialrunanalysis(data):
     
@@ -79,8 +83,6 @@ class ConditionalAccuracyFunction():
             
             # Read in behavioral file
             dDATTABLE = createdattable(inputfile)
-            dDATTABLEL = len(dDATTABLE)
-
             GroupValues = []
 
             # Combine trial types (just in case)
@@ -221,7 +223,7 @@ class ConditionalAccuracyFunction():
                             if tempmeanrt > 0.0:
                                 # Check that medianrt is not zero when mean is not zero
                                 if tempmedianrt == 0.0:
-                                    tempmedian = tempmeanrt
+                                    tempmedianrt = tempmeanrt
                                     
                             setattr(self, ('bin%d_meanrt' % (self.cutoffs.index(gBins)+1)), tempmeanrt)
                             setattr(self, ('bin%d_medianrt' % (self.cutoffs.index(gBins)+1)), tempmedianrt)
@@ -250,18 +252,143 @@ class ConditionalAccuracyFunction():
         self.fulloutput = mastertempbinvalues
 
 
+class ReciprocalRT():
+
+    def __init__(self):  
+        self.mean = False
+        self.multiple = 1
+        self.score = numpy.nan
+
+    def run(self, inputfile = [], trialtypes = [], multiple = 1, method = False, invertaccuracy = False):
+
+        self.__init__()
+        self.multiple = multiple
+        self.mean = method
+        if (os.path.isfile(inputfile)):
+            
+            # Read in behavioral file
+            dDATTABLE = createdattable(inputfile)
+            GroupValues = []
+
+            # Combine trial types (just in case)
+            if not trialtypes:
+                trialtypes = [i+1 for i in range(255)]
+            if trialtypes:
+                if isinstance(trialtypes, (int)):
+                    GroupValues.append(str(trialtypes))
+                else:
+                    for g in trialtypes:
+                        GroupValues.append(str(g))
+
+            # Sift through data for the requested trial types
+            #0-Trial  1-Resp    2-Type   3-Correct  4-Latency
+            dGroup = []
+            for currentline in dDATTABLE:
+                typevalue = currentline[2]
+                if GroupValues:
+                    bolMatch = 0
+                    for Grouptemp in GroupValues:
+                        if Grouptemp == typevalue:
+                            bolMatch = 1
+                else:
+                    bolMatch = 1
+
+                if bolMatch == 1:
+                    if not not invertaccuracy: # is it not empty
+                        if (invertaccuracy == 'True'):
+                            if (currentline[3] == '0'):
+                                currentline[3] = '1'
+                            elif (currentline[3] == '1'):
+                                currentline[3] = '0'
+                        if (invertaccuracy == 'Natalie'):
+                            if (currentline[1] == '0'):
+                                if (currentline[3] == '0'):
+                                    currentline[3] = '1'
+                            else:
+                                currentline[3] = '0'
+                                                        
+                    dGroup.append(currentline)
+
+            # Transfer data in and reset outputs
+            self.data = dGroup   
+            
+            if self.data:
+                #Obtains the number of overall trials
+                self.totaltrials = int(len(self.data))
+                
+                #This section takes the information and reads it into memory creating lists containing the information
+                dCorrectTrialsRequiringAResponse = []
+                dCorrectTrialsWithoutAResponse = []
+                dErrorsOfCommission = []
+                dErrorsOfOmission = []
+                dErrorsOfImpulse = []
+                dErrorsOfDelay = []
+
+                for currentline in self.data:
+                    #0-Trial  1-Resp    2-Type   3-Correct  4-Latency
+                    if (currentline[1] == '0') | (currentline[1] == 'nan') :
+                        if (currentline[3] == '0'):
+                            dErrorsOfOmission.append(currentline)
+                        if (currentline[3] == '1'):
+                            dCorrectTrialsWithoutAResponse.append(currentline)
+                    else:
+                        if (currentline[3] == '1'):
+                            dCorrectTrialsRequiringAResponse.append(currentline)
+                        if (currentline[3] == '0'):
+                            dErrorsOfCommission.append(currentline)
+                    if (currentline[3] == '-1'):
+                        dErrorsOfImpulse.append(currentline)
+                    if (currentline[3] == '-2'):
+                        dErrorsOfDelay.append(currentline)
+
+
+                # Compute RT for correct trials requiring a response
+                templatency = []
+                templatencyscore = []
+                for currentline in dCorrectTrialsRequiringAResponse:
+                    if (float(currentline[4]) > 0.0):
+                        RT = (1 / float(currentline[4])) * float(self.multiple)
+                        templatency.append(RT)
+                        templatencyscore.append((1 / numpy.sqrt(float(currentline[4]))) * float(self.multiple))
+                templatency = clearnan(templatency)
+                templatencyscore = clearnan(templatencyscore)
+                if (len(templatency) > 0):
+                    
+                    # Wainer, H. (1977). Speed vs reaction time as a measure of cognitive performance. Memory & Cognition, 5(2), 278-280.
+                    # modified to be 1 / sqrt( RT )
+                    
+                    # attempt float64 conversion for accuracy
+                    try:
+                        if self.mean:
+                            self.score = numpy.mean(numpy.array(templatency, dtype=numpy.float64))
+                        else:
+                            self.score = numpy.sum(numpy.array(templatencyscore, dtype=numpy.float64))
+                    except:
+                        if self.mean:
+                            self.score = numpy.mean(numpy.array(templatency, dtype=numpy.float))
+                        else:
+                            self.score = numpy.sum(numpy.array(templatencyscore, dtype=numpy.float))
+                    
+
+
+                                
+
+
+
 class BehavioralAnalysis():
 
     def __init__(self):   
         self.extendedanalysis = True
-        self.parameters = ['totaltrials', 'meanrt', 'medianrt', 'sdrt', 'cvrt', 'responseaccuracy', 'inverseefficiency', 'totalerrors', 'totalcommissionerrors', 'totalomissionerrors', 'totalimpulsiveerrors', 'totaldelayederrors', 'correctruns', 'correctdist', 'commissionerrorruns', 'commissionerrordist', 'omissionerrorruns', 'omissionerrordist', 'impulsiveerrorruns', 'impulsiveerrordist', 'delayederrorruns', 'delayederrordist', 'errorlatency', 'errorlatencysd', 'matchcorrectlatency', 'matchcorrectlatencysd', 'posterroraccuracy', 'postmatchcorrectaccuacy', 'posterrorlatency', 'postmatchcorrectlatency', 'shortoutput', 'fulloutput', 'data']
+        self.parameters = ['totaltrials', 'meanrt', 'medianrt', 'speed', 'sdrt', 'cvrt', 'responseaccuracy', 'inverseefficiency', 'score', 'totalerrors', 'totalcommissionerrors', 'totalomissionerrors', 'totalimpulsiveerrors', 'totaldelayederrors', 'correctruns', 'correctdist', 'commissionerrorruns', 'commissionerrordist', 'omissionerrorruns', 'omissionerrordist', 'impulsiveerrorruns', 'impulsiveerrordist', 'delayederrorruns', 'delayederrordist', 'errorlatency', 'errorlatencysd', 'matchcorrectlatency', 'matchcorrectlatencysd', 'posterroraccuracy', 'postmatchcorrectaccuacy', 'posterrorlatency', 'postmatchcorrectlatency', 'shortoutput', 'fulloutput', 'data']
         self.totaltrials = numpy.nan
         self.meanrt = numpy.nan
         self.medianrt = numpy.nan
+        self.speed = numpy.nan
         self.sdrt = numpy.nan
         self.cvrt = numpy.nan
         self.responseaccuracy = numpy.nan
         self.inverseefficiency = numpy.nan
+        self.score = numpy.nan
         self.totalerrors = numpy.nan
         self.totalcommissionerrors = numpy.nan
         self.totalomissionerrors = numpy.nan
@@ -285,17 +412,19 @@ class BehavioralAnalysis():
         self.postmatchcorrectaccuracy = numpy.nan
         self.posterrorlatency = numpy.nan
         self.postmatchcorrectlatency = numpy.nan
-        self.shortoutputlabels = ['totaltrials', 'meanrt', 'medianrt', 'sdrt', 'cvrt', 'responseaccuracy', 'inverseefficiency', 'totalerrors', 'totalcommissionerrors', 'totalomissionerrors', 'totalimpulsiveerrors', 'totaldelayederrors']
-        self.fulloutputlabels = ['totaltrials', 'meanrt', 'medianrt', 'sdrt', 'cvrt', 'responseaccuracy', 'inverseefficiency', 'totalerrors', 'totalcommissionerrors', 'totalomissionerrors', 'totalimpulsiveerrors', 'totaldelayederrors', 'correctruns', 'correctdist', 'commissionerrorruns', 'commissionerrordist', 'omissionerrorruns', 'omissionerrordist', 'impulsiveerrorruns', 'impulsiveerrordist', 'delayederrorruns', 'delayederrordist', 'errorlatency', 'errorlatencysd', 'matchcorrectlatency', 'matchcorrectlatencysd', 'posterroraccuracy', 'postmatchcorrectaccuracy', 'posterrorlatency', 'postmatchcorrectlatency']
+        self.shortoutputlabels = ['totaltrials', 'meanrt', 'medianrt', 'speed', 'sdrt', 'cvrt', 'responseaccuracy', 'inverseefficiency', 'score', 'totalerrors', 'totalcommissionerrors', 'totalomissionerrors', 'totalimpulsiveerrors', 'totaldelayederrors']
+        self.fulloutputlabels = ['totaltrials', 'meanrt', 'medianrt', 'speed', 'sdrt', 'cvrt', 'responseaccuracy', 'inverseefficiency', 'score', 'totalerrors', 'totalcommissionerrors', 'totalomissionerrors', 'totalimpulsiveerrors', 'totaldelayederrors', 'correctruns', 'correctdist', 'commissionerrorruns', 'commissionerrordist', 'omissionerrorruns', 'omissionerrordist', 'impulsiveerrorruns', 'impulsiveerrordist', 'delayederrorruns', 'delayederrordist', 'errorlatency', 'errorlatencysd', 'matchcorrectlatency', 'matchcorrectlatencysd', 'posterroraccuracy', 'postmatchcorrectaccuracy', 'posterrorlatency', 'postmatchcorrectlatency']
         
         self.shortoutput = []
         self.shortoutput.append(self.totaltrials)
         self.shortoutput.append(self.meanrt)
         self.shortoutput.append(self.medianrt)
+        self.shortoutput.append(self.speed)
         self.shortoutput.append(self.sdrt)
         self.shortoutput.append(self.cvrt)
         self.shortoutput.append(self.responseaccuracy)
         self.shortoutput.append(self.inverseefficiency)
+        self.shortoutput.append(self.score)
         self.shortoutput.append(self.totalerrors)
         self.shortoutput.append(self.totalcommissionerrors)
         self.shortoutput.append(self.totalomissionerrors)
@@ -306,10 +435,12 @@ class BehavioralAnalysis():
         self.fulloutput.append(self.totaltrials)
         self.fulloutput.append(self.meanrt)
         self.fulloutput.append(self.medianrt)
+        self.fulloutput.append(self.speed)
         self.fulloutput.append(self.sdrt)
         self.fulloutput.append(self.cvrt)
         self.fulloutput.append(self.responseaccuracy)
         self.fulloutput.append(self.inverseefficiency)
+        self.fulloutput.append(self.score)
         self.fulloutput.append(self.totalerrors)
         self.fulloutput.append(self.totalcommissionerrors)
         self.fulloutput.append(self.totalomissionerrors)
@@ -339,10 +470,12 @@ class BehavioralAnalysis():
         self.shortoutput.append(self.totaltrials)
         self.shortoutput.append(self.meanrt)
         self.shortoutput.append(self.medianrt)
+        self.shortoutput.append(self.speed)
         self.shortoutput.append(self.sdrt)
         self.shortoutput.append(self.cvrt)
         self.shortoutput.append(self.responseaccuracy)
         self.shortoutput.append(self.inverseefficiency)
+        self.shortoutput.append(self.score)
         self.shortoutput.append(self.totalerrors)
         self.shortoutput.append(self.totalcommissionerrors)
         self.shortoutput.append(self.totalomissionerrors)
@@ -352,10 +485,12 @@ class BehavioralAnalysis():
         self.fulloutput.append(self.totaltrials)
         self.fulloutput.append(self.meanrt)
         self.fulloutput.append(self.medianrt)
+        self.fulloutput.append(self.speed)
         self.fulloutput.append(self.sdrt)
         self.fulloutput.append(self.cvrt)
         self.fulloutput.append(self.responseaccuracy)
         self.fulloutput.append(self.inverseefficiency)
+        self.fulloutput.append(self.score)
         self.fulloutput.append(self.totalerrors)
         self.fulloutput.append(self.totalcommissionerrors)
         self.fulloutput.append(self.totalomissionerrors)
@@ -393,13 +528,11 @@ class BehavioralAnalysis():
             
             # Read in behavioral file
             dDATTABLE = createdattable(inputfile)
-            dDATTABLEL = len(dDATTABLE)
-
             GroupValues = []
 
             # Combine trial types (just in case)
             if not trialtypes:
-                trialtypes = [i+1 for i in xrange(255)]
+                trialtypes = [i+1 for i in range(255)]
             if trialtypes:
                 if isinstance(trialtypes, (int)):
                     GroupValues.append(str(trialtypes))
@@ -494,9 +627,18 @@ class BehavioralAnalysis():
 
                 # Compute RT for correct trials requiring a response
                 templatency = []
+                # Wainer, H. (1977). Speed vs reaction time as a measure of cognitive performance. Memory & Cognition, 5(2), 278-280.
+                templatencyspeed = []
+                templatencyscore = []
                 for currentline in dCorrectTrialsRequiringAResponse:
                     templatency.append(float(currentline[4]))
+                    templatencyspeed.append(numpy.multiply(numpy.divide(1.0,float(currentline[4])),1000.0))
+                    # extention of the speed concept with 1 / sqrt( RT ) to reduce the speed accuracy trade off - score is the sum
+                    templatencyscore.append(numpy.multiply(numpy.divide(1.0,numpy.sqrt(float(currentline[4]))),100.0))
+                    
                 templatency = clearnan(templatency)
+                templatencyspeed = clearnan(templatencyspeed)
+                templatencyscore = clearnan(templatencyscore)
                 if (len(templatency) > 0):
                     
                     # attempt float64 conversion for accuracy
@@ -504,17 +646,24 @@ class BehavioralAnalysis():
                         templatency = numpy.array(templatency, dtype=numpy.float64)
                         self.meanrt = numpy.mean(templatency)
                         self.medianrt = numpy.median(templatency)
+                        self.speed = numpy.mean(templatencyspeed)
                         self.sdrt = numpy.std(templatency)
+                        self.score = numpy.sum(templatencyscore)
                     except:
                         templatency = numpy.array(templatency, dtype=numpy.float)
                         self.meanrt = numpy.mean(templatency) 
                         self.medianrt = numpy.median(templatency)
+                        self.speed = numpy.mean(templatencyspeed)
                         self.sdrt = numpy.std(templatency)
+                        self.score = numpy.sum(templatencyscore)
                     self.cvrt = numpy.true_divide(self.sdrt,self.meanrt)
                     self.cvrt = float("%.3f" % (numpy.round(float(self.cvrt),decimals=3)))
                     self.meanrt = float("%.1f" % (numpy.round(float(self.meanrt),decimals=1)))
                     self.medianrt = float("%.1f" % (numpy.round(float(self.medianrt),decimals=1)))
                     self.sdrt = float("%.1f" % (numpy.round(float(self.sdrt),decimals=1)))
+                    
+                    self.speed = float("%.2f" % (numpy.round(float(self.speed),decimals=2)))
+                    self.score = float("%.2f" % (numpy.round(float(self.score),decimals=2)))
                     
                     if self.meanrt > 0.0:
                         # Check that medianrt is not zero when mean is not zero
@@ -743,10 +892,12 @@ class BehavioralAnalysis():
             self.shortoutput.append(self.totaltrials)
             self.shortoutput.append(self.meanrt)
             self.shortoutput.append(self.medianrt)
+            self.shortoutput.append(self.speed)
             self.shortoutput.append(self.sdrt)
             self.shortoutput.append(self.cvrt)
             self.shortoutput.append(self.responseaccuracy)
             self.shortoutput.append(self.inverseefficiency)
+            self.shortoutput.append(self.score)
             self.shortoutput.append(self.totalerrors)
             self.shortoutput.append(self.totalcommissionerrors)
             self.shortoutput.append(self.totalomissionerrors)
@@ -756,10 +907,12 @@ class BehavioralAnalysis():
             self.fulloutput.append(self.totaltrials)
             self.fulloutput.append(self.meanrt)
             self.fulloutput.append(self.medianrt)
+            self.fulloutput.append(self.speed)
             self.fulloutput.append(self.sdrt)
             self.fulloutput.append(self.cvrt)
             self.fulloutput.append(self.responseaccuracy)
             self.fulloutput.append(self.inverseefficiency)
+            self.fulloutput.append(self.score)
             self.fulloutput.append(self.totalerrors)
             self.fulloutput.append(self.totalcommissionerrors)
             self.fulloutput.append(self.totalomissionerrors)
@@ -839,7 +992,6 @@ def createdattable( filin ):
                     currentline[4] = 'nan'
             currentline[4] = numpy.float(currentline[4])
             dattab1.append(currentline)
-    dnumberoflines = len(dattab1)
 
     p = 0
     dattab = []
@@ -903,10 +1055,8 @@ def obtaindatheaderinfo( inputfile = [], content=[]):
     if inputfile:
         if content:
             dcontents = 0
-            deveryline = []
 
             dcontents = open(inputfile).readlines()
-            startingpoint = []
             for dinfo in range(0, len(dcontents)):
                 currentline = dcontents[dinfo].split()
                 if (currentline[0] == content):
@@ -993,7 +1143,7 @@ def createboldoutputfile( inputfile = [], correctoutputfile = [], incorrectoutpu
         # Populate trial types
         GroupValues = []
         if not trialtypes:
-            trialtypes = [i+1 for i in xrange(255)]
+            trialtypes = [i+1 for i in range(255)]
         if trialtypes:
             for g in trialtypes:
                 GroupValues.append(int(g))
@@ -1228,6 +1378,89 @@ def clearnan(templatency):
         templatency.remove(numpy.nan)
     return templatency 
 
+def TranslatePsychoJSData(inputfile = []):
+    
+    if (os.path.isfile(inputfile)):
+        
+        dcontents = 0
+        deveryline = []
+        # Read data in
+        dcontents = open(inputfile).readlines()
+        for dinfo in range(0, len(dcontents)):
+            deveryline.append(dcontents[dinfo].split('\n'))
+             
+        currentline = deveryline[1][0].split(',')
+        
+        try:
+            currentline = deveryline[1][0].split(',')
+        except:
+            raise Exception('Problem parsing' + inputfile)
+            
+        newfilename = str(currentline[11]).upper()
+        outputfile = os.path.dirname(inputfile) + os.path.sep + str(newfilename.replace(" ", "")) + '.psydat'
+        
+        if (os.path.isfile(outputfile)):
+            tempst = '_1'
+            while (os.path.isfile(os.path.dirname(inputfile) + os.path.sep + str(newfilename.replace(" ", "")) + tempst + '.psydat')):
+                tempst = tempst + '_1'
+            outputfile = os.path.dirname(inputfile) + os.path.sep + str(newfilename.replace(" ", "")) + tempst + '.psydat'
+
+        
+        f = open(outputfile, 'w')
+        f.write('gentask.....= PsychoPy_Engine_3')
+        f.write('\n')
+        f.write('date........= ')
+        f.write(currentline[12].split('_')[0])
+        f.write('\n')
+        f.write('time........= ')
+        f.write(currentline[12].split('_')[1])
+        f.write('\n')
+        f.write('refreshrate.= ')
+        f.write(currentline[13])
+        f.write(' ms')
+        f.write('\n')
+        
+        f.write(('Trial').rjust(7))
+        f.write(('Event').rjust(16))
+        f.write(('Duration').rjust(16))
+        f.write(('ISI').rjust(16))
+        f.write(('ITI').rjust(16))
+        f.write(('Type').rjust(16))
+        f.write(('Resp').rjust(16))
+        f.write(('Correct').rjust(16))
+        f.write(('Latency').rjust(16))
+        f.write(('ClockLatency').rjust(16))
+        f.write(('Trigger').rjust(16))
+        f.write(('MinRespWin').rjust(16))
+        f.write(('MaxRespWin').rjust(16))
+        f.write(('Stimulus').rjust(16))
+        f.write('\n')
+        
+        f.write(('---').rjust(7))   
+        for n in range(1,13):
+            f.write(('---').rjust(16))
+        f.write(('---').rjust(11))
+        f.write('\n')
+        
+        for m in range(1, len(dcontents)):
+            currentline = deveryline[m][0].split(',')
+            f.write(str(currentline[1]).rjust(7)) # Trial
+            f.write(str('Stimulus').rjust(16)) # Event
+            f.write(str(currentline[4]).rjust(16)) # Duration
+            f.write(str('nan').rjust(16)) # ISI
+            f.write(str('nan').rjust(16)) # ITI
+            f.write(str(currentline[6]).rjust(16)) # Type
+            f.write(str(currentline[8]).rjust(16)) # Resp
+            f.write(str(currentline[10]).rjust(16)) # Correct
+            f.write(str(currentline[9]).rjust(16)) # Latency
+            f.write(str(currentline[3]).rjust(16)) # ClockLatency
+            f.write(str('0').rjust(16)) # Trigger
+            f.write(str('nan').rjust(16)) # MinRespWindow
+            f.write(str('nan').rjust(16)) # MaxRespWindow
+            f.write('        ')
+            f.write(str(currentline[7]).ljust(16)) # Stimulus
+            f.write('\n')
+        f.close()
 
 
 class TranslateBehavioralData():
