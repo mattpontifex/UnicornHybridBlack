@@ -80,13 +80,16 @@ def createoddballsequence(filout = [], cycles = [], parameters=[]):
                 tout = parameters[3]
                 
             if newvarlabels[i] == 'correctResp':
-                tout = parameters[4]
+                if sequence[cT] == 20:
+                    tout = parameters[4]
+                else:
+                    tout = 0
                 
             if newvarlabels[i] == 'stimulusCode':
                 tout = sequence[cT]
             
             f.write(str(tout)) # Write data as a string to file
-            if (i != len(newvarlabels)): f.write(', ') # Include Comma between each item
+            if (i < len(newvarlabels)): f.write(', ') # Include Comma between each item
         f.write('\n') # Write end of line character 
     
     f.close() # close file 
