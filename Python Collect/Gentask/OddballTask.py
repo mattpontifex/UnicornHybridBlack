@@ -2,6 +2,7 @@ import os
 import Engine.xcat as xcat
 import Engine.filesync as filesync
 from Engine.basicstimuluspresentationengine import Engine
+import Engine.generatesequence as generatesequence
 import Engine.eegpipe as eegpipe
 
 if __name__ == "__main__":
@@ -13,11 +14,12 @@ if __name__ == "__main__":
     task = Engine()
     
     # Instructions
-    task.instructioncard = ['Instruction_Card.png']
+    task.instructioncard = ['OddballInstructions.png']
     task.showinstructions = True
     
     # Sequence File
-    task.sequence = 'OddballTask.csv'
+    generatesequence.createoddballsequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, parameters = [100, 80, 900, 1000, 'j'])
+    task.sequence = 'randomsequence.csv'
     
     # Filename Prefix and Suffix
     task.prefix = 'OB'
@@ -53,14 +55,14 @@ if __name__ == "__main__":
     # Begin the Task
     task.start()
     
-    task.outputfile = 'Raw\OBMattApril2.psydat'
+    #task.outputfile = 'Raw\OBMattApril2.psydat'
     # Check Performance Settings using xcat
     taskoutput = xcat.BehavioralAnalysis()
-    taskoutput.run(inputfile = task.outputfile, trialtypes = [6, 8, 10, 12])
+    taskoutput.run(inputfile = task.outputfile, trialtypes = [10, 20, 30])
     taskoutput.show(label = 'All', header = True)
-    taskoutput.run(inputfile = task.outputfile, trialtypes = [6, 8])
+    taskoutput.run(inputfile = task.outputfile, trialtypes = [20])
     taskoutput.show(label = 'Target')
-    taskoutput.run(inputfile = task.outputfile, trialtypes = [10, 12])
+    taskoutput.run(inputfile = task.outputfile, trialtypes = [10, 30])
     taskoutput.show(label = 'Nontarget')
     
     # Process EEG    
@@ -72,7 +74,7 @@ if __name__ == "__main__":
         bollfail = True
     EEG = eegpipe.simplefilter(EEG, Filter = 'Notch', Cutoff = [60.0])
     EEG = eegpipe.simplefilter(EEG, Filter = 'Bandpass', Design = 'Butter', Cutoff = [1.0, 25.0], Order=3)
-    EEG = eegpipe.simpleepoch(EEG, Window = [-0.500, 1.000], Types = [6, 8, 10006, 10008])
+    EEG = eegpipe.simpleepoch(EEG, Window = [-0.500, 1.000], Types = [20, 10020])
     EEG = eegpipe.simplebaselinecorrect(EEG, Window = [-0.100, 0.0])
     EEG = eegpipe.voltagethreshold(EEG, Threshold = [-100.0, 100.0], Step = 50.0)
     EEG = eegpipe.simplefilter(EEG, Design = 'savitzky-golay', Order = 4)
