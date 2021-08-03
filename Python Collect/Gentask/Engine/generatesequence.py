@@ -13,7 +13,7 @@ def createoddballsequence(filout = [], cycles = [], parameters=[]):
     f = open(filout, 'w') # Write Variable Labels to Database - Any original file is overwritten
     for i in newvarlabels:
         f.write(i)   # Write variable to file
-        if (i != newvarlabels[-1]): f.write(', ') # Insert Comma between each variable
+        if (i != newvarlabels[-1]): f.write(',') # Insert Comma between each variable
     f.write('\n') # Write end of line character
     
     
@@ -89,7 +89,7 @@ def createoddballsequence(filout = [], cycles = [], parameters=[]):
                 tout = sequence[cT]
             
             f.write(str(tout)) # Write data as a string to file
-            if (i < len(newvarlabels)): f.write(', ') # Include Comma between each item
+            if (i < len(newvarlabels)): f.write(',') # Include Comma between each item
         f.write('\n') # Write end of line character 
     
     f.close() # close file 
