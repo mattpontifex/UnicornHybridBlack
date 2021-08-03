@@ -18,7 +18,7 @@ if __name__ == "__main__":
     task.showinstructions = True
     
     # Sequence File
-    generatesequence.createoddballsequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, parameters = [100, 80, 900, 1000, 'j'])
+    generatesequence.createoddballsequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, parameters = [200, 200, 900, 1100, 'm'])
     task.sequence = 'randomsequence.csv'
     
     # Filename Prefix and Suffix
@@ -31,7 +31,7 @@ if __name__ == "__main__":
     task.permanentframemask = ''
     
     # Usable keys during task
-    task.participantkeys = ['1', '4', 'enter', 'a', 'l']
+    task.participantkeys = ['1', '4', 'enter', 'a', 'l', 'm']
     
     # Experiment Flow Settings
     task.pauseatstart = False # Only Experimentor can advance to the task after the instructions
