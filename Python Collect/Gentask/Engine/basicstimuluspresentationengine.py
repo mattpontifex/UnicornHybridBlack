@@ -112,6 +112,7 @@ class Engine():
         self.unicorn = []
         self.unicornchannels = 'FZ, C3, CZ, C4, PZ, O1, OZ, O2, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
         self.testblock = False
+        self.unicornrequired = True
         
         self.mri = False
         self.mritriggerinputs = ['^', 'caret', '/', 'slash', 'escape', 'return', 'space']
@@ -143,6 +144,10 @@ class Engine():
         if self.debug:
             self.printoutput = True
         
+        if not self.unicornrequired:
+            # if the unicorn device is not required
+            self.unicorn = []
+            
         ##### Prompt for filename or use default ##### 
         if not self.testblock:
             dlg=gui.Dlg(title='Enter the Participant ID Number')
@@ -1308,6 +1313,7 @@ class Engine():
                 
             # Import Sequence Information
             self.sequencelist = []
+            
             with open(os.path.join(self.folders.sequencefolder, self.sequence), 'rU') as csvfile:
                  spamreader = csv.reader(csvfile, delimiter=' ', quotechar='|')
                  for row in spamreader:
@@ -1316,10 +1322,12 @@ class Engine():
                     if (templist[1] != ''):
                         self.sequencelist.append(templist)
             self.sequencelistL = len(self.sequencelist)
+            
 
             # Identifies Location of Necessary Information
             seqHeaders = self.sequencelist[0]
             seqHeadersL = len(seqHeaders)
+            
             self.seqNstimulusFile = seqHeaders.index('stimulusFile')
             self.seqNstimulusDuration = seqHeaders.index('stimulusDuration')
             self.seqNresponseWindow_min = seqHeaders.index('responseWindow_min')
@@ -1329,6 +1337,7 @@ class Engine():
             self.seqNstimulusYcoord = seqHeaders.index('stimulusYcoord')
             self.seqNcorrectResp = seqHeaders.index('correctResp')
             self.seqNstimulusCode = seqHeaders.index('stimulusCode')
+            
             try:
                 self.seqNstimulusDuration_min = seqHeaders.index('stimulusDuration_min')
             except:
@@ -1449,7 +1458,7 @@ class Engine():
                 seqHeadersL = seqHeadersL + 1
                 for n in range(1,self.sequencelistL):
                     self.sequencelist[n].append('0') # Populate with Zeros
-                    
+            
 
             image_file_types = ['.gif', '.png', '.jpg', '.bmp', '.tiff', '.jpeg', '.pbm', '.pgm', '.ppm', '.rast', '.xbm', '.rgb']
             movie_file_types = ['.mov', '.wmv', '.mp4']
@@ -1622,6 +1631,7 @@ class Engine():
             self.sequenceready = True
             if self.expdisp:
                 self.experimenternotificationtext.setText('sequence file loaded...'); self.experimenterwin.flip()
+            
             self.preloadstimuli()
             
     def preloadstimuli(self):
@@ -1797,7 +1807,7 @@ class Engine():
                     else:
                         self.sequencelist[n][self.seqNcommissionErrorStimulusFile] = '-1'
                     if (self.sequencelist[n][self.seqNomissionErrorStimulusFile] != '0'):
-                        if self.sequencelist[n][self.seqNomissionErrorStimulustype] == '2': # if the stimulus type is audio
+                        if self.sequencelist[n][self.seqNomissionErrorfStimulustype] == '2': # if the stimulus type is audio
                             self.sequencelist[n][self.seqNomissionErrorStimulusFile] = self.individualaudiolist.index(self.sequencelist[n][self.seqNomissionErrorStimulusFile]) # replaces the file name with the unique audio identifier
                     else:
                         self.sequencelist[n][self.seqNomissionErrorStimulusFile] = '-1'

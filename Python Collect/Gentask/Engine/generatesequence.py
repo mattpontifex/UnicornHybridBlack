@@ -54,6 +54,52 @@ def createoddballsequence(filout = [], cycles = [], parameters=[]):
     # unpack chunks
     sequence = [item for sublist in sequence for item in sublist]
     
+    dummytrials = [10, 10, 20]
+    for cT in range(len(dummytrials)): # loop through each trial
+        
+        for i in range(len(newvarlabels)):
+            tout = 0
+            
+            if newvarlabels[i] == 'stimulusFile':
+                if dummytrials[cT] == 10:
+                    tout = 'nontarget.png'
+                elif dummytrials[cT] == 20:
+                    tout = 'target.png'
+                elif dummytrials[cT] == 30:
+                    tout = 'distractor.png'
+                
+            if newvarlabels[i] == 'stimulusDuration':
+                if dummytrials[cT] == 20:
+                    tout = numpy.multiply(parameters[2], 2)
+                else:
+                    tout = parameters[1]
+                
+            if newvarlabels[i] == 'stimulusDuration_min':
+                tout = parameters[1]
+                
+            if newvarlabels[i] == 'responseWindow_min':
+                tout = parameters[1]
+                
+            if newvarlabels[i] == 'responseWindow_max':
+                tout = parameters[2]
+                
+            if dummytrials[cT] == 20:
+                if newvarlabels[i] == 'postResponseInterval':
+                    tout = 1000.0
+            else:
+                if newvarlabels[i] == 'stimulusITI':
+                    tout = parameters[3]
+                
+            if newvarlabels[i] == 'correctResp':
+                if dummytrials[cT] == 20:
+                    tout = parameters[4]
+                else:
+                    tout = 0
+                
+            f.write(str(tout)) # Write data as a string to file
+            if (i < len(newvarlabels)): f.write(',') # Include Comma between each item
+        f.write('\n') # Write end of line character 
+    
     for cT in range(len(sequence)): # loop through each trial
         for i in range(len(newvarlabels)):
             tout = 0
@@ -159,10 +205,16 @@ def constrainbacksequence(sequence, newsequence):
     
     
 
-def createnbacksequence(filout = [], cycles = [], style=1, back=2, parameters=[]):
+def createnbacksequence(filout = [], cycles = [], style=1, back=2, parameters=[], feedback=[]):
     # Example Code:
-    # createnbacksequence(filout = 'S:\Data\Raw\randomsequence.csv', cycles = 1, style = 1, back = 2, parameters = [200, 150, 1450, 1500, ['z','m']])
+    # createnbacksequence(filout = 'S:\Data\Raw\randomsequence.csv', cycles = 1, style = 1, back = 2, parameters = [200, 150, 1450, 1500, ['z','m']], feedback = [])
     
+    if len(feedback) > 0:
+        tempfeedback = [0]*6
+        for i in range(len(feedback)):
+            tempfeedback[i] = feedback[i]
+        feedback = copy.deepcopy(tempfeedback)
+        
     # populate headers
     newvarlabels = ['stimulusFile','preStimulusInterval','stimulusDuration','stimulusDuration_min','responseWindow_min','responseWindow_max','stimulusITI','postResponseInterval','stimulusXcoord','stimulusYcoord', 'correctResp','stimulusCode','maskFile','feedbackDuration','preFeedbackDelay','endFeedbackWithResponse','correctResponseStimulusFile','correctResponseCode','commissionErrorStimulusFile','commissionErrorCode', 'omissionErrorStimulusFile','omissionErrorCode','impulsiveErrorStimulusFile','impulsiveErrorCode','delayErrorStimulusFile','delayErrorCode']
     
@@ -263,6 +315,7 @@ def createnbacksequence(filout = [], cycles = [], style=1, back=2, parameters=[]
         
     # determine trial type
     typecode = [10] * len(sequence)
+    respcode = [10] * len(sequence)
     for cT in range(len(sequence)):
         typecode[cT] = numpy.add(10, sequence[cT])
         
@@ -271,15 +324,18 @@ def createnbacksequence(filout = [], cycles = [], style=1, back=2, parameters=[]
             if sequence[cT] == sequence[cT-1]:
                 # 1back hit
                 typecode[cT] = numpy.add(20, sequence[cT])
+                respcode[cT] = 20
                 
         if cT > 1:
             if sequence[cT] == sequence[cT-2]:
                 # 2back hit
                 typecode[cT] = numpy.add(30, sequence[cT])
+                respcode[cT] = 30
                 
                 if sequence[cT] == sequence[cT-1]:
                     # 1back and 2back hit
                     typecode[cT] = numpy.add(40, sequence[cT])
+                    respcode[cT] = 40
     
     
     locationcounter = [0] * len(locations)
@@ -313,6 +369,19 @@ def createnbacksequence(filout = [], cycles = [], style=1, back=2, parameters=[]
                         tout = 'SNB6.png'
                 elif style == 2:
                     if sequence[cT] == 1:
+                        tout = 'SNBfu1.png'
+                    elif sequence[cT] == 2:
+                        tout = 'SNBfu2.png'
+                    elif sequence[cT] == 3:
+                        tout = 'SNBfu3.png'
+                    elif sequence[cT] == 4:
+                        tout = 'SNBfu4.png'
+                    elif sequence[cT] == 5:
+                        tout = 'SNBfu5.png'
+                    elif sequence[cT] == 6:
+                        tout = 'SNBfu6.png'
+                elif style == 3:
+                    if sequence[cT] == 1:
                         tout = 'SNBf1.png'
                     elif sequence[cT] == 2:
                         tout = 'SNBf2.png'
@@ -341,20 +410,27 @@ def createnbacksequence(filout = [], cycles = [], style=1, back=2, parameters=[]
                 tout = parameters[3]
                 
             if newvarlabels[i] == 'correctResp':
-                
-                if back == 1:
-                    if (typecode[cT] == 20) or (typecode[cT] == 40):
-                        tout = parameters[4][1]
-                    else:
-                        tout = parameters[4][0]
-                        
-                elif back == 2:
-                    if (typecode[cT] == 30) or (typecode[cT] == 40):
-                        tout = parameters[4][1]
-                    else:
-                        tout = parameters[4][0]
-                        
+                if style < 3:
+                    if back == 1:
+                        if (respcode[cT] == 20) or (respcode[cT] == 40):
+                            tout = parameters[4][1]
+                        else:
+                            tout = parameters[4][0]
+                            
+                    elif back == 2:
+                        if (respcode[cT] == 30) or (respcode[cT] == 40):
+                            tout = parameters[4][1]
+                        else:
+                            tout = parameters[4][0]
+                            
+                elif style == 3:
                     tout = 0
+                    if back == 1:
+                        if cT > 0:
+                            tout = parameters[4][sequence[cT-1]-1]
+                    if back == 2:
+                        if cT > 1:
+                            tout = parameters[4][sequence[cT-2]-1]
                 
             if newvarlabels[i] == 'stimulusCode':
                 tout = typecode[cT]
@@ -364,6 +440,71 @@ def createnbacksequence(filout = [], cycles = [], style=1, back=2, parameters=[]
                 if back == 2:
                     if cT < 2:
                         tout = 0
+                        
+            if len(feedback) > 0:
+                boolpass = True         
+                if back == 1:
+                    if cT == 0:
+                        boolpass = False
+                if back == 2:
+                    if cT < 2:
+                        boolpass = False
+                if boolpass:
+                    if newvarlabels[i] == 'feedbackDuration':
+                        tout = feedback[0]
+                    #if newvarlabels[i] == 'preFeedbackDelay':
+                    #if newvarlabels[i] == 'endFeedbackWithResponse':
+                    if feedback[1] != 0:
+                        if newvarlabels[i] == 'correctResponseStimulusFile':
+                            if style == 1:
+                                tout = 'SNBcorrect.png'
+                            elif style == 2:
+                                tout = 'SNBfucorrect.png'
+                            elif style == 3:
+                                tout = 'SNBfcorrect.png'
+                        if newvarlabels[i] == 'correctResponseCode':
+                            tout = 50
+                    if feedback[2] != 0:
+                        if newvarlabels[i] == 'commissionErrorStimulusFile':
+                            if style == 1:
+                                tout = 'SNBerror.png'
+                            elif style == 2:
+                                tout = 'SNBferror.png'
+                            elif style == 3:
+                                tout = 'SNBferror.png'
+                        if newvarlabels[i] == 'commissionErrorCode':
+                            tout = 51
+                    if feedback[3] != 0:
+                        if newvarlabels[i] == 'omissionErrorStimulusFile':
+                            if style == 1:
+                                tout = 'SNBerror.png'
+                            elif style == 2:
+                                tout = 'SNBferror.png'
+                            elif style == 3:
+                                tout = 'SNBferror.png'
+                        if newvarlabels[i] == 'omissionErrorCode':
+                            tout = 52
+                    if feedback[4] != 0:
+                        if newvarlabels[i] == 'impulsiveErrorStimulusFile':
+                            if style == 1:
+                                tout = 'SNBerror.png'
+                            elif style == 2:
+                                tout = 'SNBferror.png'
+                            elif style == 3:
+                                tout = 'SNBferror.png'
+                        if newvarlabels[i] == 'impulsiveErrorCode':
+                            tout = 53
+                    if feedback[5] != 0:
+                        if newvarlabels[i] == 'delayErrorStimulusFile':
+                            if style == 1:
+                                tout = 'SNBerror.png'
+                            elif style == 2:
+                                tout = 'SNBferror.png'
+                            elif style == 3:
+                                tout = 'SNBferror.png'
+                        if newvarlabels[i] == 'delayErrorCode':
+                            tout = 54
+
             
             f.write(str(tout)) # Write data as a string to file
             if (i < len(newvarlabels)): f.write(',') # Include Comma between each item
