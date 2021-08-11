@@ -14,11 +14,11 @@ if __name__ == "__main__":
     task = Engine()
     
     # Instructions
-    task.instructioncard = ['OddballInstructions.png']
+    task.instructioncard = ['SNBp1.png', 'SNBp2.png', 'SNBp3.png', 'SNBp4.png', 'SNBp5.png', 'SNBp6.png', 'SNBp7.png']
     task.showinstructions = True
     
     # Sequence File
-    generatesequence.createoddballsequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, parameters = [200, 200, 900, 1100, 'm'])
+    generatesequence.createnbacksequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, style = 1, back = 2, parameters = [500, 100, 2450, 2500, ['z','m']], feedback = [80, 0, 1, 1, 1, 1])
     task.sequence = 'randomsequence.csv'
     
     # Filename Prefix and Suffix
@@ -28,10 +28,10 @@ if __name__ == "__main__":
     task.testblock = False
     
     # Global image frame/mask
-    task.permanentframemask = ''
+    task.permanentframemask = 'SNB6grid.png'
     
     # Usable keys during task
-    task.participantkeys = ['1', '4', 'enter', 'a', 'l', 'm']
+    task.participantkeys = ['1', '4', 'enter', 'a', 'l', 'z', 'm', 's','d','f','j','k']
     
     # Experiment Flow Settings
     task.pauseatstart = False # Only Experimentor can advance to the task after the instructions
@@ -59,11 +59,11 @@ if __name__ == "__main__":
     #task.outputfile = 'Raw\OBMattApril2.psydat'
     # Check Performance Settings using xcat
     taskoutput = xcat.BehavioralAnalysis()
-    taskoutput.run(inputfile = task.outputfile, trialtypes = [10, 20, 30])
+    taskoutput.run(inputfile = task.outputfile, trialtypes = [10, 20, 30, 40])
     taskoutput.show(label = 'All', header = True)
-    taskoutput.run(inputfile = task.outputfile, trialtypes = [20])
+    taskoutput.run(inputfile = task.outputfile, trialtypes = [30, 40])
     taskoutput.show(label = 'Target')
-    taskoutput.run(inputfile = task.outputfile, trialtypes = [10, 30])
+    taskoutput.run(inputfile = task.outputfile, trialtypes = [10, 20])
     taskoutput.show(label = 'Nontarget')
     
     # Process EEG    
