@@ -513,3 +513,343 @@ def createnbacksequence(filout = [], cycles = [], style=1, back=2, parameters=[]
     f.close() # close file 
 
   
+    
+    
+
+def createflankersequence(filout = [], cycles = [], style = 1, parameters=[], variableiti=0, feedback = []):
+    # Example Code:
+    # createflankersequence(filout = 'S:\Data\Raw\randomsequence.csv', cycles = 2, parameters = [55, 100, 80, 1000, 1500, ['z','m']], variableiti=250, feedback = [])
+
+    # Traditional
+    # Respond Opposite
+    # Include neutral Trials
+    # Include cue masks
+    # Letters or Arrows?
+    # Flip mid task?
+    # response cues at bottom of screen?
+    
+    if len(feedback) > 0:
+        tempfeedback = [0]*6
+        for i in range(len(feedback)):
+            tempfeedback[i] = feedback[i]
+        feedback = copy.deepcopy(tempfeedback)
+        
+    # populate headers
+    newvarlabels = ['stimulusFile','preStimulusInterval','stimulusDuration','stimulusDuration_min','responseWindow_min','responseWindow_max','stimulusITI','postResponseInterval','stimulusXcoord','stimulusYcoord', 'correctResp','stimulusCode','maskFile','feedbackDuration','preFeedbackDelay','endFeedbackWithResponse','correctResponseStimulusFile','correctResponseCode','commissionErrorStimulusFile','commissionErrorCode', 'omissionErrorStimulusFile','omissionErrorCode','impulsiveErrorStimulusFile','impulsiveErrorCode','delayErrorStimulusFile','delayErrorCode']
+    
+    # Populate database with variable names
+    f = open(filout, 'w') # Write Variable Labels to Database - Any original file is overwritten
+    for i in newvarlabels:
+        f.write(i)   # Write variable to file
+        if (i != newvarlabels[-1]): f.write(',') # Insert Comma between each variable
+    f.write('\n') # Write end of line character
+    
+    
+    blocks = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    blocks = blocks * cycles
+    random.shuffle(blocks)
+    sequence = [[]]
+    
+    for cB in range(len(blocks)):
+        newsequence = [0] * 4
+        
+        if (blocks[cB] == 1):
+            newsequence = [12, 10, 22, 20]
+            
+        elif (blocks[cB] == 2):
+            newsequence = [10, 12, 20, 22]
+            
+        elif (blocks[cB] == 3):
+            newsequence = [12,	20,	22,	12,	10,	22]
+            
+        elif (blocks[cB] == 4):
+            newsequence = [10,	22,	20,	10,	12,	20]
+            
+        elif (blocks[cB] == 5):
+            newsequence = [12, 22, 20, 10, 22, 12, 10, 20]
+            
+        elif (blocks[cB] == 6):
+            newsequence = [20,	22,	12,	20,	12,	10,	20,	10]
+            
+        elif (blocks[cB] == 7):
+            newsequence = [22,	20,	10,	22,	10,	12,	22,	12]
+            
+        elif (blocks[cB] == 8):
+            newsequence = [22,	10,	20,	12,	10,	22,	10,	20]
+            
+        elif (blocks[cB] == 9):
+            newsequence = [20,	12,	22,	10,	12,	20,	12,	22]
+    
+        if cB == 0:
+            sequence = sequence + [newsequence]
+        else:
+            sequence = sequence + [newsequence[0:len(newsequence)]]
+        
+    sequence = [item for sublist in sequence for item in sublist]
+        
+    # determine trial type
+    typecode = [0] * len(sequence)
+    respcode = [0] * len(sequence)
+    for cT in range(len(sequence)):
+        # 10 - congruent left             
+        # 12 - congruent right
+        # 20 - incongruent left
+        # 22 - incongruent right
+        
+        typecode[cT] = sequence[cT]
+        tempcode = 0
+    
+        # code current direction
+        if sequence[cT] == 10 or sequence[cT] == 20:
+            # left
+            tempcode = numpy.add(1, tempcode)
+            respcode[cT] = parameters[5][0]
+        else:
+            # right
+            tempcode = numpy.add(2, tempcode)
+            respcode[cT] = parameters[5][1]
+            
+        if cT > 0:
+            
+            # code if a response change occurred
+            if (sequence[cT] == 10 or sequence[cT] == 20) and (sequence[cT-1] == 10 or sequence[cT-1] == 20):
+                # left on both
+                tempcode = numpy.add(10, tempcode)
+            elif (sequence[cT] == 12 or sequence[cT] == 22) and (sequence[cT-1] == 12 or sequence[cT-1] == 22):
+                # right on both
+                tempcode = numpy.add(10, tempcode)
+            else:
+                # different
+                tempcode = numpy.add(20, tempcode)
+            
+            # code if current trial is congruent
+            if sequence[cT] == 10 or sequence[cT] == 12:
+                # current trial is congruent
+                tempcode = numpy.add(100, tempcode)
+            else:
+                # current trial is incongruent
+                tempcode = numpy.add(200, tempcode)
+                
+            # code if previous trial is congruent
+            if sequence[cT-1] == 10 or sequence[cT-1] == 12:
+                # prev trial is congruent
+                tempcode = numpy.add(1000, tempcode)
+            else:
+                # prev trial is incongruent
+                tempcode = numpy.add(2000, tempcode)
+                
+            # CongCongSameL - 1111   30
+            # CongCongSameR - 1112   32
+            # CongCongDiffL - 1121   31
+            # CongCongDiffR - 1122   33
+            if tempcode == 1111:
+                typecode[cT] = 30
+            elif tempcode == 1112:
+                typecode[cT] = 32
+            elif tempcode == 1121:
+                typecode[cT] = 31
+            elif tempcode == 1122:
+                typecode[cT] = 33
+                
+            # IncoCongSameL - 2111   34
+            # IncoCongSameR - 2112   36
+            # IncoCongDiffL - 2121   35
+            # IncoCongDiffR - 2122   37
+            elif tempcode == 2111:
+                typecode[cT] = 34
+            elif tempcode == 2112:
+                typecode[cT] = 36
+            elif tempcode == 2121:
+                typecode[cT] = 35
+            elif tempcode == 2122:
+                typecode[cT] = 37
+                
+            # CongIncoSameL - 1211   40
+            # CongIncoSameR - 1212   42
+            # CongIncoDiffL - 1221   41
+            # CongIncoDiffR - 1222   43
+            elif tempcode == 1211:
+                typecode[cT] = 40
+            elif tempcode == 1212:
+                typecode[cT] = 42
+            elif tempcode == 1221:
+                typecode[cT] = 41
+            elif tempcode == 1222:
+                typecode[cT] = 43
+        
+            # IncoIncoSameL - 2211   44
+            # IncoIncoSameR - 2212   46
+            # IncoIncoDiffL - 2221   45
+            # IncoIncoDiffR - 2222   47
+            elif tempcode == 2211:
+                typecode[cT] = 44
+            elif tempcode == 2212:
+                typecode[cT] = 46
+            elif tempcode == 2221:
+                typecode[cT] = 45
+            elif tempcode == 2222:
+                typecode[cT] = 47
+                
+            # CC - [10, 12, 30, 31, 32, 33]
+            # IC - [34, 35, 36, 37]
+            # CI - [20, 22, 40, 41, 42, 43]
+            # II - [44, 45, 46, 47]
+            # cong - [10, 12, 30, 31, 32, 33, 34, 35, 36, 37]
+            # inco - [20, 22, 40, 41, 42, 43, 44, 45, 46, 47]
+    
+    # allow ITI to vary
+    itilist = [parameters[4]] * len(sequence)
+    if not variableiti == 0:
+        # varies the ITI using a gaussian distribution
+        tempitilist = numpy.random.normal(loc=parameters[4], scale=variableiti, size=len(sequence))
+        for cT in range(len(tempitilist)):
+            # force the value to be in multiples of the screen refresh rate - assume 120 hz
+            tempiti = round(numpy.divide(tempitilist[cT], 8.3),0)
+            itilist[cT] = round(numpy.multiply(tempiti, 8.3),0)
+    
+    for cT in range(len(sequence)): # loop through each trial
+        tend = 2
+        
+        # flanking stimuli are presented concurrent with target
+        if parameters[0] == 0:
+            tend = 1
+            
+        for ti in range(tend):
+            # loops through once if flanking stimuli are presented concurrent with target
+            # loops through twice if flanking stimuli are presented prior to target
+            
+            for i in range(len(newvarlabels)):
+                tout = 0
+                
+                if newvarlabels[i] == 'stimulusFile':
+                    if ti == (tend - 1):
+                        # full stim
+                        if sequence[cT] == 10:
+                            tout = 'congruentleft.png'
+                        elif sequence[cT] == 12:
+                            tout = 'congruentright.png'
+                        elif sequence[cT] == 20:
+                            tout = 'incongruentleft.png'
+                        elif sequence[cT] == 22:
+                            tout = 'incongruentright.png'
+                    else:
+                        # just the flanking
+                        if sequence[cT] == 10:
+                            tout = 'flankingleft.png'
+                        elif sequence[cT] == 12:
+                            tout = 'flankingright.png'
+                        elif sequence[cT] == 20:
+                            tout = 'flankingright.png'
+                        elif sequence[cT] == 22:
+                            tout = 'flankingleft.png'
+                    
+                if newvarlabels[i] == 'stimulusDuration':
+                    if ti == (tend - 1):
+                        # full stim
+                        tout = parameters[1]
+                    else:
+                        # just the flanking
+                        tout = parameters[0]
+                    
+                if newvarlabels[i] == 'stimulusDuration_min':
+                    if ti == (tend - 1):
+                        # full stim
+                        tout = parameters[2]
+                    else:
+                        # just the flanking
+                        tout = parameters[0]
+                        
+                if newvarlabels[i] == 'responseWindow_min':
+                    if ti == (tend - 1):
+                        # full stim
+                        tout = parameters[2]
+                    else:
+                        # just the flanking
+                        tout = numpy.subtract(parameters[0],1)
+                    
+                if newvarlabels[i] == 'responseWindow_max':
+                    if ti == (tend - 1):
+                        # full stim
+                        tout = parameters[3]
+                    else:
+                        # just the flanking
+                        tout = parameters[0]
+                    
+                if newvarlabels[i] == 'stimulusITI':
+                    if ti == (tend - 1):
+                        # full stim
+                        tout = itilist[cT]
+                    else:
+                        # just the flanking
+                        tout = parameters[0]
+                    
+                if newvarlabels[i] == 'correctResp':
+                    if ti == (tend - 1):
+                        # full stim
+                        tout = respcode[cT]
+                    else:
+                        # just the flanking
+                        tout = 0
+                    
+                if newvarlabels[i] == 'stimulusCode':
+                    if ti == (tend - 1):
+                        # full stim
+                        tout = typecode[cT]
+                    else:
+                        # just the flanking
+                        if sequence[cT] == 10:
+                            tout = 5
+                        elif sequence[cT] == 12:
+                            tout = 6
+                        elif sequence[cT] == 20:
+                            tout = 6
+                        elif sequence[cT] == 22:
+                            tout = 5
+                            
+                if len(feedback) > 0:
+                    if ti == (tend - 1):
+                        # feedback only for target trials
+                        if newvarlabels[i] == 'feedbackDuration':
+                            tout = feedback[0]
+                            
+                        if feedback[1] != 0:
+                            if newvarlabels[i] == 'correctResponseStimulusFile':
+                                tout = 'flankercorrect.png'
+                                
+                            if newvarlabels[i] == 'correctResponseCode':
+                                tout = 50
+                                
+                        if feedback[2] != 0:
+                            if newvarlabels[i] == 'commissionErrorStimulusFile':
+                                tout = 'flankererror.png'
+                                
+                            if newvarlabels[i] == 'commissionErrorCode':
+                                tout = 51
+                                
+                        if feedback[3] != 0:
+                            if newvarlabels[i] == 'omissionErrorStimulusFile':
+                                tout = 'flankererror.png'
+                                
+                            if newvarlabels[i] == 'omissionErrorCode':
+                                tout = 52
+                                
+                        if feedback[4] != 0:
+                            if newvarlabels[i] == 'impulsiveErrorStimulusFile':
+                                tout = 'flankererror.png'
+                                
+                            if newvarlabels[i] == 'impulsiveErrorCode':
+                                tout = 53
+                                
+                        if feedback[5] != 0:
+                            if newvarlabels[i] == 'delayErrorStimulusFile':
+                                tout = 'flankererror.png'
+                                
+                            if newvarlabels[i] == 'delayErrorCode':
+                                tout = 54
+        
+                f.write(str(tout)) # Write data as a string to file
+                if (i < len(newvarlabels)): f.write(',') # Include Comma between each item
+            f.write('\n') # Write end of line character 
+    
+    f.close() # close file 
+    
