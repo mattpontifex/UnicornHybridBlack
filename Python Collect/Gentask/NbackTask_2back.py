@@ -58,37 +58,76 @@ if __name__ == "__main__":
     
     #task.outputfile = 'Raw\OBMattApril2.psydat'
     # Check Performance Settings using xcat
+    datapull = [[0, 0], [0, 0], [0, 0]]
     taskoutput = xcat.BehavioralAnalysis()
     taskoutput.run(inputfile = task.outputfile, trialtypes = [10, 20, 30, 40])
     taskoutput.show(label = 'All', header = True)
     taskoutput.run(inputfile = task.outputfile, trialtypes = [30, 40])
     taskoutput.show(label = 'Target')
+    datapull[0][0] = taskoutput.meanrt
+    datapull[1][0] = taskoutput.sdrt
+    datapull[2][0] = taskoutput.responseaccuracy
     taskoutput.run(inputfile = task.outputfile, trialtypes = [10, 20])
     taskoutput.show(label = 'Nontarget')
+    datapull[0][1] = taskoutput.meanrt
+    datapull[1][1] = taskoutput.sdrt
+    datapull[2][1] = taskoutput.responseaccuracy
     
     # Process EEG    
     print('\nPlease wait while the EEG data is rapid processed.')
-    EEG = eegpipe.readUnicornBlack(task.outputfile.split('.')[0] + '.csv')
+    eggchunk = None
+    wavechunk = None
     try:
-        EEG = eegpipe.mergetaskperformance(EEG, task.outputfile.split('.')[0] + '.psydat')
+        EEG = eegpipe.readUnicornBlack(task.outputfile.split('.')[0] + '.csv')
+        try:
+            EEG = eegpipe.mergetaskperformance(EEG, task.outputfile.split('.')[0] + '.psydat')
+        except:
+            boolfail = True
+        EEG = eegpipe.simplefilter(EEG, Filter = 'Notch', Cutoff = [60.0])
+        EEG = eegpipe.simplefilter(EEG, Filter = 'Bandpass', Design = 'Butter', Cutoff = [1.0, 25.0], Order=3)
+        EEG = eegpipe.simpleepoch(EEG, Window = [-0.500, 1.000], Types = [20, 10020])
+        EEG = eegpipe.simplebaselinecorrect(EEG, Window = [-0.100, 0.0])
+        EEG = eegpipe.voltagethreshold(EEG, Threshold = [-100.0, 100.0], Step = 50.0)
+        EEG = eegpipe.simplefilter(EEG, Design = 'savitzky-golay', Order = 4)
+        EEG = eegpipe.simplezwave(EEG, BaselineWindow = [-0.500, 0.0])
+        EEG = eegpipe.simpleaverage(EEG, Approach = 'Mean')
+        eegpipe.saveset(EEG, task.outputfile)
+        
+        #[outputamplitude, outputlatency] = eegpipe.extractpeaks(EEG, Window=[0.300, 0.700], Points=9)
+        outputamplitude = eegpipe.extractamplitude(EEG, Window=[0.300, 0.700], Approach='mean')
+        outputchannels = [x.strip() for x in task.unicornchannels.split(',')[0:8]]
+        [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
+        eegpipe.eggheadplot(outputchannels, outputamplitude, Scale = [0, max(outputamplitude)*0.9], Steps = 256, BrainOpacity = 0.2, Title ='Egghead', Colormap=eegpipe.crushparula(256))
     except:
-        bollfail = True
-    EEG = eegpipe.simplefilter(EEG, Filter = 'Notch', Cutoff = [60.0])
-    EEG = eegpipe.simplefilter(EEG, Filter = 'Bandpass', Design = 'Butter', Cutoff = [1.0, 25.0], Order=3)
-    EEG = eegpipe.simpleepoch(EEG, Window = [-0.500, 1.000], Types = [20, 10020])
-    EEG = eegpipe.simplebaselinecorrect(EEG, Window = [-0.100, 0.0])
-    EEG = eegpipe.voltagethreshold(EEG, Threshold = [-100.0, 100.0], Step = 50.0)
-    EEG = eegpipe.simplefilter(EEG, Design = 'savitzky-golay', Order = 4)
-    EEG = eegpipe.simplezwave(EEG, BaselineWindow = [-0.500, 0.0])
-    EEG = eegpipe.simpleaverage(EEG, Approach = 'Mean')
-    eegpipe.saveset(EEG, task.outputfile)
-    
-    #[outputamplitude, outputlatency] = eegpipe.extractpeaks(EEG, Window=[0.300, 0.700], Points=9)
-    outputamplitude = eegpipe.extractamplitude(EEG, Window=[0.300, 0.700], Approach='mean')
-    outputchannels = [x.strip() for x in task.unicornchannels.split(',')[0:8]]
-    [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
-    eegpipe.eggheadplot(outputchannels, outputamplitude, Scale = [0, max(outputamplitude)*0.9], Steps = 256, BrainOpacity = 0.2, Title ='Egghead', Colormap=eegpipe.crushparula(256))
+        boolfail = True
 
+    # send data to reporting window
+    Speed = eegpipe.barplotprep()
+    Speed.title = 'Speed'
+    Speed.labels = ['Target', 'Nontarget']
+    Speed.values = datapull[0]
+    Speed.scale = [150, 500]
+    Speed.biggerisbetter = False
+    Speed.unit = ' ms'
+    
+    Consistency = eegpipe.barplotprep()
+    Consistency.title = 'Consistency'
+    Consistency.labels = ['Target', 'Nontarget']
+    Consistency.values = datapull[1]
+    Consistency.scale = [20, 300]
+    Consistency.biggerisbetter = False
+    Consistency.unit = ' ms'
+    
+    Accuracy = eegpipe.barplotprep()
+    Accuracy.title = 'Accuracy'
+    Accuracy.labels = ['Target', 'Nontarget']
+    Accuracy.values = datapull[2]
+    Accuracy.scale = [50, 100]
+    Accuracy.biggerisbetter = True
+    Accuracy.unit = ' %'
+    
+    barchunks = [Speed, Consistency, Accuracy]
+    eegpipe.reportingwindow(eggs=eggchunk, waveforms=wavechunk, bars=barchunks)
 
     # Backup data
     #filesync.pushfiles(inpath = '\\Studies\Raw', outpath = 'Z:\Studies\Raw', file_types = ['.psydat', '.tsv', '.tsve', '.csv', '.csve'])
