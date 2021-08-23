@@ -2858,7 +2858,7 @@ def barsubplot(values, scale, ax=None, width=None, colorscale=None, units=None, 
         if len(labels[cT]) > 10:
             labels[cT] = labels[cT][0:10]
         
-    matplotlib.pyplot.sca(ax)
+    #matplotlib.pyplot.sca(ax)
     ax.spines['top'].set_visible(False)
     ax.spines['bottom'].set_visible(True)
     ax.spines['left'].set_visible(False)
@@ -2903,7 +2903,7 @@ def barsubplot(values, scale, ax=None, width=None, colorscale=None, units=None, 
                 ax.text(subxloc, numpy.add(scaledvalues[cT],2), tempstringout, color='black', fontweight='bold', fontsize=10, ha='center', va='center')
         
     
-    matplotlib.pyplot.show()
+    #matplotlib.pyplot.show()
 
 
 class eggheadplotprep():
