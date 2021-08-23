@@ -14,8 +14,8 @@ if __name__ == "__main__":
     task = Engine()
     
     # Instructions
-    task.instructioncard = []
-    task.showinstructions = False
+    task.instructioncard = ['FlankerPrac1.png', 'FlankerPrac2.png', 'FlankerPrac3.png', 'FlankerPrac4.png', 'FlankerPrac5.png', 'FlankerPrac6.png']
+    task.showinstructions = True
     
     # Sequence File
     generatesequence.createflankersequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, style = 1, parameters = [55, 100, 80, 1000, 1500, ['z','m']], variableiti = False, feedback = [80, 0, 1, 1, 1, 1])
