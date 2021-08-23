@@ -2699,33 +2699,528 @@ def createsignal(Window, Latency, Amplitude, Width, Shape, Smoothing, OverallSmo
 
     return [outsum, outvect, xtime]
 
+
+
+
+
+
+################################################################################################################################################
+################################################################################################################################################
+################################################################################################################################################    
+#################### Reporting Window Functions 
+################################################################################################################################################
+################################################################################################################################################
+################################################################################################################################################
+    
+
+
+
+
+class barplotprep():
+    def __init__(self):
+        self.title = ''
+        self.labels = ['']
+        self.values = [0]
+        self.scale = [0, 100]
+        self.biggerisbetter = True
+        self.unit = ''
+        self.width = 0.5
+
+def wavesubplot(waves, scale=None, ax=None, colorscale=None, positivedown=False):
+    
+    # still need to fix
+    # make it so that if user gives two different epoch windows, it can still plot them
+
+    if colorscale == None:
+        if len(waves) > 4:
+            #colorscale = crushparula(numpy.multiply(len(waves),2))
+            segs = ['#1CD496', '#2A60EB', '#A91CD4', '#F65A3D'] 
+            colorscale = LinearSegmentedColormap.from_list("", segs, numpy.multiply(len(waves),1.2)) 
+        
+            for cA in range(len(waves)):
+                if waves[cA].linecolor == None:
+                    waves[cA].linecolor = colorscale(cA)
+                    
+        else:
+            segs = ['#1CD496', '#2A60EB', '#A91CD4', '#F65A3D'] 
+            for cA in range(len(waves)):
+                if waves[cA].linecolor == None:
+                    waves[cA].linecolor = segs[cA]
+ 
+        
+        
+    tempmin = waves[0].x[0]
+    tempmax = waves[0].x[-1]
+    for cA in range(len(waves)):
+        if waves[cA].x[0] < tempmin:
+            tempmin = waves[cA].x[0]
+        if waves[cA].x[-1] < tempmax:
+            tempmax = waves[cA].x[-1]
+            
+        
+    matplotlib.pyplot.sca(ax)
+    ax.spines['top'].set_visible(False)
+    ax.spines['bottom'].set_visible(True)
+    ax.spines['left'].set_visible(True)
+    ax.spines['right'].set_visible(False)
+    
+    matplotlib.pyplot.tick_params(
+        axis='both',          # changes apply to the x-axis
+        which='both',      # both major and minor ticks are affected
+        left=True,      # ticks along the left edge are off
+        right=False,      # ticks along the right edge are off
+        bottom=True,      # ticks along the bottom edge are off
+        top=False,         # ticks along the top edge are off
+        labelleft=True,
+        labelbottom=True) # labels along the bottom edge are off
+    
+    #ax.patch.set_facecolor('#FFFFFF')
+    matplotlib.pyplot.xlabel("Time")
+    matplotlib.pyplot.ylabel("Amplitude");
+    
+    for cA in range(len(waves)):
+        ax.plot(waves[cA].x, waves[cA].y, color = waves[cA].linecolor, linestyle = waves[cA].linestyle, linewidth = waves[cA].lineweight, label=waves[cA].title)
+
+    for cA in range(len(waves)):
+        if waves[cA].fillbetween != None:
+            
+            targ = 0
+            for cAT in range(len(waves)):
+                if waves[cAT].title == waves[cA].fillbetween:
+                    targ = cAT
+                
+            winstart = 0
+            winstop = -1
+            if waves[cA].fillwindow != None:
+                winstart = closestidx(waves[cA].x, waves[cA].fillwindow[0])
+                winstop = closestidx(waves[cA].x, waves[cA].fillwindow[1])
+                
+            ax.fill_between(waves[cA].x[winstart:winstop], waves[cA].y[winstart:winstop], waves[targ].y[winstart:winstop], color=waves[cA].fillbetweencolor, alpha=waves[cA].fillbetweenopacity)
+        
+    if scale != None:
+        matplotlib.pyplot.ylim(scale)
+    
+    if positivedown:
+        ax.invert_yaxis()
+    
+    matplotlib.pyplot.legend();
+        
+
+def barsubplot(values, scale, ax=None, width=None, colorscale=None, units=None, title=None, labels=None, plotvalue=True, biggerisbetter=True, alternatelabelsat=3):
+    #barsubplot(values = [700, numpy.nan, 60], scale = [80, 600], biggerisbetter = False, labels = ['Target', 'Nontarget', 'Reference'], units = ' ms', title = 'Speed', plotvalue = True, colorscale = None, width = 0.4)
+    
+    if title == None:
+        title = ''
+    if units == None:
+        units = ''
+    if width == None:
+        width = 0.4
+    if labels == None:
+        labels = [''] * len(values)
+        
+    # just remove NaN
+    #tempvals = []
+    #templabels = []
+    #for cT in range(len(values)):  
+    #    if not numpy.isnan(values[cT]):
+    #        tempvals.append(values[cT])
+    #        templabels.append(labels[cT])
+    #values = copy.deepcopy(tempvals)
+    #labels = copy.deepcopy(templabels)
+    
+    if colorscale == None:
+        #colorscale = crushparula(100)
+        #colorscale = colorscale.reversed()
+        segs = ['#4CC700', '#53E6E3', '#DDDEF4', '#E273F5', '#D13608'] 
+        colorscale = LinearSegmentedColormap.from_list("", segs, 100) 
+        colorscale = colorscale.reversed()
+        
+        
+    colorvalues = [0] * len(values)
+    scaledvalues = [0] * len(values)
+    for cT in range(len(values)):  
+        scaledvalues[cT] = numpy.multiply(numpy.subtract(values[cT], scale[0]) / numpy.subtract(scale[1], scale[0]),100)
+        if not biggerisbetter:
+            scaledvalues[cT] = numpy.subtract(100, scaledvalues[cT])
+            
+        if not numpy.isnan(values[cT]):
+            if scaledvalues[cT] < 3:
+                scaledvalues[cT] = 3
+            if scaledvalues[cT] > 100:
+                scaledvalues[cT] = 100
+            
+            colorvalues[cT] = colorscale(int(round(scaledvalues[cT],0)))
+        else:
+            colorvalues[cT] = colorscale(0)
+    
+    
+    for cT in range(len(labels)):  
+        if len(labels[cT]) > 10:
+            labels[cT] = labels[cT][0:10]
+        
+    matplotlib.pyplot.sca(ax)
+    ax.spines['top'].set_visible(False)
+    ax.spines['bottom'].set_visible(True)
+    ax.spines['left'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    
+    matplotlib.pyplot.tick_params(
+        axis='both',          # changes apply to the x-axis
+        which='both',      # both major and minor ticks are affected
+        left=False,      # ticks along the left edge are off
+        right=False,      # ticks along the right edge are off
+        bottom=False,      # ticks along the bottom edge are off
+        top=False,         # ticks along the top edge are off
+        labelleft=False,
+        labelbottom=False) # labels along the bottom edge are off
+    
+    #ax.patch.set_facecolor('#FFFFFF')
+    
+    ax.set_title(title, color='black', fontweight='bold', fontsize=16)
+    x_pos = numpy.arange(len(values))
+    
+    # plot scaled values
+    matplotlib.pyplot.bar(x_pos, scaledvalues, width, color=colorvalues)
+    matplotlib.pyplot.ylim((0,110))
+    
+    # add some labels
+    alternator = False
+    for cT in range(len(labels)): 
+        if not numpy.isnan(values[cT]):
+            subxloc = x_pos[cT] # snag the middle coordinate
+            subyloc = -10
+            if len(labels) > int(alternatelabelsat):
+                if alternator:
+                    subyloc = -18
+                    alternator = False
+                else:
+                    alternator = True
+            
+            ax.text(subxloc, subyloc, str(labels[cT]), color='black', fontweight='bold', fontsize=16, ha='center', va='center')
+        
+            if plotvalue:
+                tempstringout = str(round(values[cT],1)) + units
+                ax.text(subxloc, numpy.add(scaledvalues[cT],2), tempstringout, color='black', fontweight='bold', fontsize=10, ha='center', va='center')
+        
+    
+    matplotlib.pyplot.show()
+
+
+class eggheadplotprep():
+    def __init__(self):
+        self.title = ''
+        self.channels = ['']
+        self.amplitudes = [0]
+        self.scale = [0, 100]
+        self.steps = 256
+        self.opacity = 0.2
+        self.colormap = None
+
+class waveformplotprep():
+    def __init__(self):
+        self.title = ''
+        self.x = [0]
+        self.y = [0]
+        self.linestyle = 'solid'
+        self.linecolor =  None
+        self.lineweight = 2
+        self.fillbetween = None
+        self.fillbetweencolor = 'k'
+        self.fillbetweenopacity = 0.1
+        self.fillwindow = None
+
+def reportingwindow(eggs=None, waveforms=None, bars=None, alternatelabelsat=2, colormap=None, tickvalues=None, waveformscale=None, waveformpositivedown=True):
+    
+    if eggs != None or waveforms != None or bars != None:
+        
+        #fullstyle = False
+        #if (eggs != None or waveforms != None) and bars != None:
+        #    # plotting bars and something else
+        #    fullstyle = True
+        
+        #if fullstyle:
+        fig = matplotlib.pyplot.figure(figsize=(20, 12))
+        #else:
+        #    fig = matplotlib.pyplot.figure(figsize=(20, 8))
+            
+        matplotlib.pyplot.rcParams['toolbar'] = 'None' # Remove tool bar (upper bar)
+        #fig.patch.set_facecolor('#FFFFFF')
+        try:
+            fig.canvas.window().statusBar().setVisible(False) 
+        except:
+            pass
+        fig.tight_layout()
+        
+        ax = fig.add_gridspec(2,2, wspace=0.2, hspace=0.80)
+        
+        # Egg head plots
+        if eggs != None:
+            if colormap == None:
+                colormap = matplotlib.pyplot.cm.viridis
+            if tickvalues == None:
+                tickvalues = matplotlib.ticker.AutoLocator()
+            
+            norm = matplotlib.colors.Normalize(vmin=eggs[0].scale[0], vmax=eggs[0].scale[1])
+        
+            # determine arrangement
+            nrow = 1;
+            ncol = 1;
+            if len(eggs) < 4:
+                ncol = len(eggs);
+            else:
+                nrow = int(numpy.ceil(numpy.divide(len(eggs),4)))
+                ncol = 4
+            
+            axhead = ax[0, 0].subgridspec(nrow, ncol, wspace=0.4, hspace=0.05)            
+            for cA in range(len(eggs)):
+                axheadsub = fig.add_subplot(axhead[0, cA])   
+                eggheadplot_sub(eggs[cA].channels, eggs[cA].amplitudes, axheadsub, Steps=eggs[cA].steps, Scale=eggs[cA].scale, Colormap=colormap, BrainOpacity=eggs[cA].opacity)
+                axheadsub.set_title(eggs[cA].title + '\n', color='black', fontweight='bold', fontsize=16, ha='center', va='center')
+                
+            pos1 = axheadsub.get_position()
+            cbar_ax = fig.add_axes([0.225, pos1.y0-0.05, 0.15, 0.02])
+            fig.colorbar(matplotlib.cm.ScalarMappable(cmap=colormap, norm=norm), cax=cbar_ax, orientation='horizontal', ticks=tickvalues)
+        
+        # Waveforms
+        if waveforms != None:
+            axwave = fig.add_subplot(ax[0, 1])
+            wavesubplot(waveforms, waveformscale, ax=axwave, colorscale=None, positivedown=waveformpositivedown)
+            
+            
+        # Bar graphs
+        if bars != None:
+            nrow = 1;
+            ncol = len(bars)
+            axbar = ax[1, 0:2].subgridspec(nrow, ncol, wspace=0.4, hspace=0.0)
+            for cA in range(len(bars)):
+                axbarsub = fig.add_subplot(axbar[0, cA])    
+                barsubplot(values = bars[cA].values, scale = bars[cA].scale, ax = axbarsub, colorscale = None, biggerisbetter = bars[cA].biggerisbetter, labels = bars[cA].labels, units = bars[cA].unit, title = bars[cA].title, plotvalue = True, alternatelabelsat=alternatelabelsat)
+            
+        
+        matplotlib.pyplot.show()
+
+
     
 # # # # #
 # DEBUG #
 if __name__ == "__main__":
     
-    EEG = eeglabstructure()
+    demo = 'main'
+    #demo = 'reporting'
+    demo = 'reportingeggs'
+    demo = 'reportingwaves'
+    if demo == 'main':
+        EEG = eeglabstructure()
+        
+        basedate = pandas.to_datetime('2020-12-29 00:00:20')
+        comparisondate = pandas.to_datetime('2020-12-29 00:01:20')
+        timevvalue = msdatefromref(basedate, comparisondate)
+        
+        textvalue = 'Mean'
+        textvalue = checkdefaultsettings(textvalue, ['median', 'mean'])
+        
+        
+        Channels = ['FPZ', 'F3', 'FZ', 'F4', 'T7', 'C3', 'CZ', 'C4', 'T8', 'P7', 'P3', 'PZ', 'P4', 'P8', 'OZ']
+        Amplitude = [0, 3, 3, 1, 0, 7, 5, 4, 0, 2, 7, 8, 2, 2, 0]
+        eggheadplot(Channels, Amplitude, Scale = [1, 9], Steps = 256, BrainOpacity = 0.2, Title ='Egghead', Colormap=crushparula(256))
     
-    basedate = pandas.to_datetime('2020-12-29 00:00:20')
-    comparisondate = pandas.to_datetime('2020-12-29 00:01:20')
-    timevvalue = msdatefromref(basedate, comparisondate)
-    
-    textvalue = 'Mean'
-    textvalue = checkdefaultsettings(textvalue, ['median', 'mean'])
-    
-    
-    Channels = ['FPZ', 'F3', 'FZ', 'F4', 'T7', 'C3', 'CZ', 'C4', 'T8', 'P7', 'P3', 'PZ', 'P4', 'P8', 'OZ']
-    Amplitude = [0, 3, 3, 1, 0, 7, 5, 4, 0, 2, 7, 8, 2, 2, 0]
-    eggheadplot(Channels, Amplitude, Scale = [1, 9], Steps = 256, BrainOpacity = 0.2, Title ='Egghead', Colormap=crushparula(256))
+        
+        [outsum, outvect, xtime] = createsignal(Window = [-0.1, 1.0],
+                     Latency =   [ 0.08,  0.25, 0.35],
+                     Amplitude = [-0.1,  -0.45, 0.50],
+                     Width =     [40,       80,  180],
+                     Shape =     [0,         0,    0],
+                     Smoothing = [0,         0,    0],
+                     OverallSmooth = 20,
+                     Srate = 250.0)
+        plot(outvect, xtime)
+        plot(outsum*-1, xtime)
 
-    
-    [outsum, outvect, xtime] = createsignal(Window = [-0.1, 1.0],
-                 Latency =   [ 0.08,  0.25, 0.35],
-                 Amplitude = [-0.1,  -0.45, 0.50],
-                 Width =     [40,       80,  180],
-                 Shape =     [0,         0,    0],
-                 Smoothing = [0,         0,    0],
-                 OverallSmooth = 20,
-                 Srate = 250.0)
-    plot(outvect, xtime)
-    plot(outsum*-1, xtime)
+    if demo == 'reporting':
+        
+        Speed = barplotprep()
+        Speed.title = 'Speed'
+        Speed.labels = ['Target', 'Nontarget']
+        Speed.values = [700, 200]
+        Speed.scale = [120, 600]
+        Speed.biggerisbetter = False
+        Speed.unit = ' ms'
+        
+        Consistency = barplotprep()
+        Consistency.title = 'Consistency'
+        Consistency.labels = ['Target']
+        Consistency.values = [120]
+        Consistency.scale = [0, 200]
+        Consistency.biggerisbetter = False
+        Consistency.unit = ' ms'
+        
+        Accuracy = barplotprep()
+        Accuracy.title = 'Accuracy'
+        Accuracy.labels = ['Target', 'Nontarget', 'Luer']
+        Accuracy.values = [65, 95, 20]
+        Accuracy.scale = [60, 90]
+        Accuracy.biggerisbetter = True
+        Accuracy.unit = ' %'
+        
+        Attention = barplotprep()
+        Attention.title = 'Attention'
+        Attention.labels = ['Target', 'Nontarget', 'Probe', 'Leur']
+        Attention.values = [65, 100, 75, 88]
+        Attention.scale = [60, 95]
+        Attention.biggerisbetter = True
+        Attention.unit = ' microV'
+        
+        Processing = barplotprep()
+        Processing.title = 'Processing'
+        Processing.labels = ['Target', 'Nontarget']
+        Processing.values = [350, 700]
+        Processing.scale = [250, 800]
+        Processing.biggerisbetter = False
+        Processing.unit = ' ms'
+        
+        chunks = [Speed, Consistency, Accuracy, Attention, Processing]
+        reportingwindow(eggs=None, waveforms=None, bars=chunks)
+        
+    if demo == 'reportingeggs':
+        
+        target = eggheadplotprep()
+        target.title = 'Target'
+        target.channels = ['FPZ', 'F3', 'FZ', 'F4', 'T7', 'C3', 'CZ', 'C4', 'T8', 'P7', 'P3', 'PZ', 'P4', 'P8', 'OZ']
+        target.amplitudes = [0, 3, 3, 1, 0, 7, 5, 4, 0, 2, 7, 8, 2, 2, 0]
+        target.scale = [1, 9]
+        target.steps = 256
+        target.opacity = 0.2
+        
+        
+        nontarget = eggheadplotprep()
+        nontarget.title = 'Nontarget'
+        nontarget.channels = ['FPZ', 'F3', 'FZ', 'F4', 'T7', 'C3', 'CZ', 'C4', 'T8', 'P7', 'P3', 'PZ', 'P4', 'P8', 'OZ']
+        nontarget.amplitudes = [0, 4, 4, 2, 0, 6, 6, 6, 0, 2, 7, 9, 9, 3, 0]
+        nontarget.scale = [1, 9]
+        nontarget.steps = 256
+        nontarget.opacity = 0.2
+
+        eggchunks = [target, nontarget]
+        
+        
+        Accuracy = barplotprep()
+        Accuracy.title = 'Accuracy'
+        Accuracy.labels = ['Target', 'Nontarget', 'Luer']
+        Accuracy.values = [65, 95, 20]
+        Accuracy.scale = [60, 90]
+        Accuracy.biggerisbetter = True
+        Accuracy.unit = ' %'
+        
+        Attention = barplotprep()
+        Attention.title = 'Attention'
+        Attention.labels = ['Target', 'Nontarget', 'Probe', 'Leur']
+        Attention.values = [65, 100, 75, 88]
+        Attention.scale = [60, 95]
+        Attention.biggerisbetter = True
+        Attention.unit = ' microV'
+        
+        Processing = barplotprep()
+        Processing.title = 'Processing'
+        Processing.labels = ['Target', 'Nontarget']
+        Processing.values = [350, 700]
+        Processing.scale = [250, 800]
+        Processing.biggerisbetter = False
+        Processing.unit = ' ms'
+        
+        chunks = [Accuracy, Attention, Processing]
+        
+        reportingwindow(eggs=eggchunks, waveforms=None, bars=chunks)
+        
+    if demo == 'reportingwaves':
+
+        
+        target = eggheadplotprep()
+        target.title = 'Target'
+        target.channels = ['FPZ', 'F3', 'FZ', 'F4', 'T7', 'C3', 'CZ', 'C4', 'T8', 'P7', 'P3', 'PZ', 'P4', 'P8', 'OZ']
+        target.amplitudes = [0, 3, 3, 1, 0, 7, 5, 4, 0, 2, 7, 8, 2, 2, 0]
+        target.scale = [1, 9]
+        target.steps = 256
+        target.opacity = 0.2
+        
+        
+        nontarget = eggheadplotprep()
+        nontarget.title = 'Nontarget'
+        nontarget.channels = ['FPZ', 'F3', 'FZ', 'F4', 'T7', 'C3', 'CZ', 'C4', 'T8', 'P7', 'P3', 'PZ', 'P4', 'P8', 'OZ']
+        nontarget.amplitudes = [0, 4, 4, 2, 0, 6, 6, 6, 0, 2, 7, 9, 9, 3, 0]
+        nontarget.scale = [1, 9]
+        nontarget.steps = 256
+        nontarget.opacity = 0.2
+
+        eggchunks = [target, nontarget]
+        
+        
+        Accuracy = barplotprep()
+        Accuracy.title = 'Accuracy'
+        Accuracy.labels = ['Target', 'Nontarget']
+        Accuracy.values = [95, 90]
+        Accuracy.scale = [80, 100]
+        Accuracy.biggerisbetter = True
+        Accuracy.unit = ' %'
+        
+        Attention = barplotprep()
+        Attention.title = 'Attention'
+        Attention.labels = ['Target', 'Nontarget']
+        Attention.values = [15, 4]
+        Attention.scale = [0, 8]
+        Attention.biggerisbetter = True
+        Attention.unit = ' microV'
+        
+        Processing = barplotprep()
+        Processing.title = 'Processing'
+        Processing.labels = ['Target', 'Nontarget']
+        Processing.values = [350, 480]
+        Processing.scale = [250, 800]
+        Processing.biggerisbetter = False
+        Processing.unit = ' ms'
+        
+        chunks = [Accuracy, Attention, Processing]
+        
+        
+        # creates a stimulus locked model ERP.
+        [outsum, outvect, xtime] = createsignal(
+             Window = [-0.1, 1.0],
+             Latency =   [ 0.08,  0.25, 0.35],
+             Amplitude = [-0.1,  -0.45, 0.50],
+             Width =     [40,       80,  180],
+             Shape =     [0,         0,    0],
+             Smoothing = [0,         0,    0],
+             OverallSmooth = 20, 
+             Srate = 250.0)
+        
+        Nontarget = waveformplotprep()
+        Nontarget.title = 'Nontarget'
+        Nontarget.x = xtime
+        Nontarget.y = numpy.multiply(outsum,0.5)
+        Nontarget.linestyle='solid'
+        Nontarget.linecolor= '#A91CD4'
+        Nontarget.lineweight=2
+        
+        Target = waveformplotprep()
+        Target.title = 'Target'
+        Target.x = xtime
+        Target.y = outsum
+        Target.linestyle='solid'
+        Target.linecolor= '#2A60EB'
+        Target.lineweight=2
+        Target.fillbetween='Nontarget'
+        Target.fillwindow=[0.3, 0.6]
+        Target.fillbetweencolor = '#EEEC00'
+        Target.fillbetweenopacity = 0.4
+        
+        Reference = waveformplotprep()
+        Reference.title = 'Reference Target'
+        Reference.x = xtime
+        Reference.y = numpy.multiply(outsum,1.5)
+        Reference.linestyle='dashed'
+        Reference.linecolor= '#768591'
+        Reference.lineweight=0.5
+        
+        wavechunks = [Nontarget, Target, Reference]
+        
+        reportingwindow(eggs=eggchunks, waveforms=wavechunks, bars=chunks, waveformscale = [-0.1, 0.75])
+        
