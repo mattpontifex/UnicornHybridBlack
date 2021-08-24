@@ -136,11 +136,12 @@ class Engine():
         self.printoutput = False
         
         self.participantwinActive = False
+        self.finished = False
         
 
         
     def start(self):
-
+        
         if self.debug:
             self.printoutput = True
         
@@ -1187,6 +1188,7 @@ class Engine():
                 
                 
                 # End of Task
+                self.finished = True
                 if self.debug:
                     print('Stimulus Events')
                     for incX in range(0,len(self.specarray)):

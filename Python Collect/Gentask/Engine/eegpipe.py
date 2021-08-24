@@ -2828,6 +2828,8 @@ def barsubplot(values, scale, ax=None, width=None, colorscale=None, units=None, 
     #values = copy.deepcopy(tempvals)
     #labels = copy.deepcopy(templabels)
     
+    continuouscolorscale = False
+    
     if colorscale == None:
         #colorscale = crushparula(100)
         #colorscale = colorscale.reversed()
@@ -2849,7 +2851,19 @@ def barsubplot(values, scale, ax=None, width=None, colorscale=None, units=None, 
             if scaledvalues[cT] > 100:
                 scaledvalues[cT] = 100
             
-            colorvalues[cT] = colorscale(int(round(scaledvalues[cT],0)))
+            if continuouscolorscale:
+                colorvalues[cT] = colorscale(int(round(scaledvalues[cT],0)))
+            else:
+                if round(scaledvalues[cT],0) > 80:
+                    colorvalues[cT] = colorscale(100)
+                elif round(scaledvalues[cT],0) > 60:
+                    colorvalues[cT] = colorscale(75)
+                elif round(scaledvalues[cT],0) > 40:
+                    colorvalues[cT] = colorscale(50)
+                elif round(scaledvalues[cT],0) > 20:
+                    colorvalues[cT] = colorscale(25)
+                else:
+                    colorvalues[cT] = colorscale(0)
         else:
             colorvalues[cT] = colorscale(0)
     
@@ -2929,7 +2943,7 @@ class waveformplotprep():
         self.fillbetweenopacity = 0.1
         self.fillwindow = None
 
-def reportingwindow(eggs=None, waveforms=None, bars=None, alternatelabelsat=2, colormap=None, tickvalues=None, waveformscale=None, waveformpositivedown=True):
+def reportingwindow(eggs=None, waveforms=None, bars=None, alternatelabelsat=2, colormap=None, tickvalues=None, waveformscale=None, waveformpositivedown=True, fileout=None):
     
     if eggs != None or waveforms != None or bars != None:
         
@@ -2997,8 +3011,11 @@ def reportingwindow(eggs=None, waveforms=None, bars=None, alternatelabelsat=2, c
                 barsubplot(values = bars[cA].values, scale = bars[cA].scale, ax = axbarsub, colorscale = None, biggerisbetter = bars[cA].biggerisbetter, labels = bars[cA].labels, units = bars[cA].unit, title = bars[cA].title, plotvalue = True, alternatelabelsat=alternatelabelsat)
             
         
-        matplotlib.pyplot.show()
+        if fileout != None:
+            matplotlib.pyplot.savefig(fileout, transparent = False, bbox_inches='tight', pad_inches=0.25, frameon=False, metadata=None, dpi=90)
 
+        matplotlib.pyplot.show()
+        
 
     
 # # # # #
