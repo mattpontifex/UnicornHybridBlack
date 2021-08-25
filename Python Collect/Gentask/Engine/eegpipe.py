@@ -1153,6 +1153,66 @@ def mergetaskperformance(EEG, filein):
 ################################################################################################################################################
 ################################################################################################################################################
 
+
+def collapsechannels(EEG, Channels, NewChannelName=None, Approach=False):
+    OUTEEG = copy.deepcopy(EEG)
+    Approach = checkdefaultsettings(Approach, ['median', 'mean'])
+    Waveform = None
+    availablechannels = copy.deepcopy(EEG.channels)
+    
+    if EEG.trials == 0:  
+        Waveform = [[numpy.nan] * len(EEG.times)] * len(Channels)
+        for cChan in range(len(Channels)):
+            try:
+                matchindex = availablechannels.index(Channels[cChan])
+            except:
+                matchindex = None
+            if matchindex != None:
+                Waveform[cChan] = EEG.data[matchindex]
+        Waveform = numpy.vstack(Waveform)
+        if Approach == 'mean':
+            Waveform = numpy.nanmean(Waveform, axis=0)
+        elif Approach == 'median':
+            Waveform = numpy.nanmedian(Waveform, axis=0)
+                
+    else:
+        Waveform = [[numpy.nan] * len(EEG.times)] * EEG.trials
+        for cE in range(EEG.trials):
+            epochwaveform = [[numpy.nan] * len(EEG.times)] * len(Channels)
+            for cChan in range(len(Channels)):
+                try:
+                    matchindex = availablechannels.index(Channels[cChan])
+                except:
+                    matchindex = None
+                if matchindex != None:
+                    epochwaveform[cChan] = EEG.data[matchindex][cE]   
+            epochwaveform = numpy.vstack(epochwaveform)
+            if Approach == 'mean':
+                epochwaveform = numpy.nanmean(epochwaveform, axis=0)
+            elif Approach == 'median':
+                epochwaveform = numpy.nanmedian(epochwaveform, axis=0)
+            Waveform[cE] = epochwaveform
+        
+    if NewChannelName == None:
+        # user did not specify a preferred name
+        NewChannelName = 'SPOT' + ''.join(Channels)
+        
+    try:
+        matchindex = availablechannels.index(NewChannelName)
+    except:
+        matchindex = None
+    if matchindex != None:
+        # user specified a channel that already exists - so just drop data there
+        OUTEEG.data[matchindex] = Waveform
+    else:
+        OUTEEG.channels.append(NewChannelName)
+        OUTEEG.data.append(Waveform)
+        
+    OUTEEG.nbchan = len(OUTEEG.data)
+            
+    return OUTEEG
+
+
 def extractamplitude(EEG, Window=False, Approach=False):
     
     Approach = checkdefaultsettings(Approach, ['median', 'mean'])
@@ -2828,8 +2888,6 @@ def barsubplot(values, scale, ax=None, width=None, colorscale=None, units=None, 
     #values = copy.deepcopy(tempvals)
     #labels = copy.deepcopy(templabels)
     
-    continuouscolorscale = False
-    
     if colorscale == None:
         #colorscale = crushparula(100)
         #colorscale = colorscale.reversed()
@@ -2851,19 +2909,7 @@ def barsubplot(values, scale, ax=None, width=None, colorscale=None, units=None, 
             if scaledvalues[cT] > 100:
                 scaledvalues[cT] = 100
             
-            if continuouscolorscale:
-                colorvalues[cT] = colorscale(int(round(scaledvalues[cT],0)))
-            else:
-                if round(scaledvalues[cT],0) > 80:
-                    colorvalues[cT] = colorscale(100)
-                elif round(scaledvalues[cT],0) > 60:
-                    colorvalues[cT] = colorscale(75)
-                elif round(scaledvalues[cT],0) > 40:
-                    colorvalues[cT] = colorscale(50)
-                elif round(scaledvalues[cT],0) > 20:
-                    colorvalues[cT] = colorscale(25)
-                else:
-                    colorvalues[cT] = colorscale(0)
+            colorvalues[cT] = colorscale(int(round(scaledvalues[cT],0)))
         else:
             colorvalues[cT] = colorscale(0)
     
@@ -2872,7 +2918,7 @@ def barsubplot(values, scale, ax=None, width=None, colorscale=None, units=None, 
         if len(labels[cT]) > 10:
             labels[cT] = labels[cT][0:10]
         
-    #matplotlib.pyplot.sca(ax)
+    matplotlib.pyplot.sca(ax)
     ax.spines['top'].set_visible(False)
     ax.spines['bottom'].set_visible(True)
     ax.spines['left'].set_visible(False)
@@ -2917,7 +2963,7 @@ def barsubplot(values, scale, ax=None, width=None, colorscale=None, units=None, 
                 ax.text(subxloc, numpy.add(scaledvalues[cT],2), tempstringout, color='black', fontweight='bold', fontsize=10, ha='center', va='center')
         
     
-    #matplotlib.pyplot.show()
+    matplotlib.pyplot.show()
 
 
 class eggheadplotprep():
@@ -2943,7 +2989,7 @@ class waveformplotprep():
         self.fillbetweenopacity = 0.1
         self.fillwindow = None
 
-def reportingwindow(eggs=None, waveforms=None, bars=None, alternatelabelsat=2, colormap=None, tickvalues=None, waveformscale=None, waveformpositivedown=True, fileout=None):
+def reportingwindow(eggs=None, waveforms=None, bars=None, alternatelabelsat=2, colormap=None, tickvalues=None, waveformscale=None, waveformpositivedown=True):
     
     if eggs != None or waveforms != None or bars != None:
         
@@ -3011,11 +3057,8 @@ def reportingwindow(eggs=None, waveforms=None, bars=None, alternatelabelsat=2, c
                 barsubplot(values = bars[cA].values, scale = bars[cA].scale, ax = axbarsub, colorscale = None, biggerisbetter = bars[cA].biggerisbetter, labels = bars[cA].labels, units = bars[cA].unit, title = bars[cA].title, plotvalue = True, alternatelabelsat=alternatelabelsat)
             
         
-        if fileout != None:
-            matplotlib.pyplot.savefig(fileout, transparent = False, bbox_inches='tight', pad_inches=0.25, frameon=False, metadata=None, dpi=90)
-
         matplotlib.pyplot.show()
-        
+
 
     
 # # # # #
