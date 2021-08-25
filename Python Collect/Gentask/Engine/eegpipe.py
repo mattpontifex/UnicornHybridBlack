@@ -215,7 +215,7 @@ def eggheadplot_sub(Channels, Amplitude, ax=None, Steps=512, Scale=False, Colorm
     Method = checkdefaultsettings(Method, ['cubic', 'linear'])
     Style = checkdefaultsettings(Style, ['Full', 'Outline', 'None'])
     
-    matplotlib.pyplot.sca(ax)
+    #matplotlib.pyplot.sca(ax)
     ax.spines['top'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
     ax.spines['left'].set_visible(False)
@@ -2818,7 +2818,7 @@ def wavesubplot(waves, scale=None, ax=None, colorscale=None, positivedown=False)
             tempmax = waves[cA].x[-1]
             
         
-    matplotlib.pyplot.sca(ax)
+    #matplotlib.pyplot.sca(ax)
     ax.spines['top'].set_visible(False)
     ax.spines['bottom'].set_visible(True)
     ax.spines['left'].set_visible(True)
@@ -2895,6 +2895,7 @@ def barsubplot(values, scale, ax=None, width=None, colorscale=None, units=None, 
         colorscale = LinearSegmentedColormap.from_list("", segs, 100) 
         colorscale = colorscale.reversed()
         
+    continuouscolorscale = False
         
     colorvalues = [0] * len(values)
     scaledvalues = [0] * len(values)
@@ -2909,7 +2910,19 @@ def barsubplot(values, scale, ax=None, width=None, colorscale=None, units=None, 
             if scaledvalues[cT] > 100:
                 scaledvalues[cT] = 100
             
-            colorvalues[cT] = colorscale(int(round(scaledvalues[cT],0)))
+            if continuouscolorscale:
+                colorvalues[cT] = colorscale(int(round(scaledvalues[cT],0)))
+            else:
+                if scaledvalues[cT] > 80:
+                    colorvalues[cT] = colorscale(100)
+                elif scaledvalues[cT] > 60:
+                    colorvalues[cT] = colorscale(75)
+                elif scaledvalues[cT] > 40:
+                    colorvalues[cT] = colorscale(50)
+                elif scaledvalues[cT] > 20:
+                    colorvalues[cT] = colorscale(25)
+                elif scaledvalues[cT] <= 20:
+                    colorvalues[cT] = colorscale(0)
         else:
             colorvalues[cT] = colorscale(0)
     
@@ -2918,7 +2931,7 @@ def barsubplot(values, scale, ax=None, width=None, colorscale=None, units=None, 
         if len(labels[cT]) > 10:
             labels[cT] = labels[cT][0:10]
         
-    matplotlib.pyplot.sca(ax)
+    #matplotlib.pyplot.sca(ax)
     ax.spines['top'].set_visible(False)
     ax.spines['bottom'].set_visible(True)
     ax.spines['left'].set_visible(False)
@@ -2962,8 +2975,6 @@ def barsubplot(values, scale, ax=None, width=None, colorscale=None, units=None, 
                 tempstringout = str(round(values[cT],1)) + units
                 ax.text(subxloc, numpy.add(scaledvalues[cT],2), tempstringout, color='black', fontweight='bold', fontsize=10, ha='center', va='center')
         
-    
-    matplotlib.pyplot.show()
 
 
 class eggheadplotprep():
@@ -2989,7 +3000,7 @@ class waveformplotprep():
         self.fillbetweenopacity = 0.1
         self.fillwindow = None
 
-def reportingwindow(eggs=None, waveforms=None, bars=None, alternatelabelsat=2, colormap=None, tickvalues=None, waveformscale=None, waveformpositivedown=True):
+def reportingwindow(eggs=None, waveforms=None, bars=None, alternatelabelsat=2, colormap=None, tickvalues=None, waveformscale=None, waveformpositivedown=True, fileout=None):
     
     if eggs != None or waveforms != None or bars != None:
         
@@ -3056,7 +3067,9 @@ def reportingwindow(eggs=None, waveforms=None, bars=None, alternatelabelsat=2, c
                 axbarsub = fig.add_subplot(axbar[0, cA])    
                 barsubplot(values = bars[cA].values, scale = bars[cA].scale, ax = axbarsub, colorscale = None, biggerisbetter = bars[cA].biggerisbetter, labels = bars[cA].labels, units = bars[cA].unit, title = bars[cA].title, plotvalue = True, alternatelabelsat=alternatelabelsat)
             
-        
+        if fileout != None:
+            matplotlib.pyplot.savefig(fileout, dpi=90, transparent=False, bbox_inches=None, pad_inches=0.1, frameon=None, metadata=None)
+            
         matplotlib.pyplot.show()
 
 
