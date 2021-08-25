@@ -145,7 +145,7 @@ if __name__ == "__main__":
         if EEGdist != None:
             [outputamplitude, outputlatency] = eegpipe.extractpeaks(EEGdist, Window=[0.300, 0.700], Points=9)
             outputamplitude = eegpipe.extractamplitude(EEGdist, Window=[0.300, 0.700], Approach='mean')
-            outputchannels = [x.strip() for x in task.unicornchannels.split(',')[0:8]]
+            outputchannels = EEGdist.channels
             # snag waveform
             distractorwave = eegpipe.waveformplotprep()
             distractorwave.title = 'Distractor'
@@ -167,7 +167,7 @@ if __name__ == "__main__":
             Orientation = eegpipe.barplotprep()
             Orientation.title = 'Orientation'
             Orientation.labels = ['Distractor']
-            Orientation.values = outputamplitude[outputchannels.index('HOTSPOT')]
+            Orientation.values = [outputamplitude[outputchannels.index('HOTSPOT')]]
             Orientation.scale = [0, 20]
             Orientation.biggerisbetter = True
             Orientation.unit = ' microV'
@@ -191,7 +191,7 @@ if __name__ == "__main__":
         if EEGtarg != None:
             [outputamplitude, outputlatency] = eegpipe.extractpeaks(EEGtarg, Window=[0.300, 0.700], Points=9)
             outputamplitude = eegpipe.extractamplitude(EEGtarg, Window=[0.300, 0.700], Approach='mean')
-            outputchannels = [x.strip() for x in task.unicornchannels.split(',')[0:8]]
+            outputchannels = EEGtarg.channels
             # snag waveform
             targetwave = eegpipe.waveformplotprep()
             targetwave.title = 'Target'
@@ -213,7 +213,7 @@ if __name__ == "__main__":
             Attention = eegpipe.barplotprep()
             Attention.title = 'Attention'
             Attention.labels = ['Target']
-            Attention.values = outputamplitude[outputchannels.index('HOTSPOT')]
+            Attention.values = [outputamplitude[outputchannels.index('HOTSPOT')]]
             Attention.scale = [0, 20]
             Attention.biggerisbetter = True
             Attention.unit = ' microV'
@@ -222,7 +222,7 @@ if __name__ == "__main__":
             Processing = eegpipe.barplotprep()
             Processing.title = 'Processing'
             Processing.labels = ['Target']
-            Processing.values = outputlatency[outputchannels.index('HOTSPOT')]
+            Processing.values = [outputlatency[outputchannels.index('HOTSPOT')]]
             Processing.scale = [0.300, 0.700]
             Processing.biggerisbetter = False
             Processing.unit = ' ms'
