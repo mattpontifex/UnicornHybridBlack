@@ -113,7 +113,6 @@ if __name__ == "__main__":
     
     
     
-    
     ### Rapid Process EEG data ######################################################################################
     print('\nPlease wait while the EEG data is rapid processed.')
     eggchunk = None
@@ -129,6 +128,52 @@ if __name__ == "__main__":
         EEG = eegpipe.simplefilter(EEG, Filter = 'Notch', Cutoff = [60.0])
         EEG = eegpipe.simplefilter(EEG, Filter = 'Bandpass', Design = 'Butter', Cutoff = [1.0, 25.0], Order=3)
         
+        # Distractor stimulus - 30
+        EEGdist = None
+        try:
+            EEGdist = eegpipe.simpleepoch(EEG, Window = [-0.500, 1.000], Types = [30, 10030])
+            EEGdist = eegpipe.simplebaselinecorrect(EEGdist, Window = [-0.100, 0.0])
+            EEGdist = eegpipe.voltagethreshold(EEGdist, Threshold = [-100.0, 100.0], Step = 50.0)
+            EEGdist = eegpipe.simplefilter(EEGdist, Design = 'savitzky-golay', Order = 4)
+            EEGdist = eegpipe.simplezwave(EEGdist, BaselineWindow = [-0.500, 0.0])
+            EEGdist = eegpipe.simpleaverage(EEGdist, Approach = 'Mean')
+            eegpipe.saveset(EEGdist, task.outputfile.split('.')[0] + '_Distractor.erp')
+            EEGdist = eegpipe.collapsechannels(EEGdist, Channels = ['C3', 'CZ', 'C4', 'CPZ', 'PZ', 'POZ'], NewChannelName='HOTSPOT', Approach='median')
+        except:
+            EEGdist = None
+            
+        if EEGdist != None:
+            [outputamplitude, outputlatency] = eegpipe.extractpeaks(EEGdist, Window=[0.300, 0.700], Points=9)
+            outputamplitude = eegpipe.extractamplitude(EEGdist, Window=[0.300, 0.700], Approach='mean')
+            outputchannels = [x.strip() for x in task.unicornchannels.split(',')[0:8]]
+            # snag waveform
+            distractorwave = eegpipe.waveformplotprep()
+            distractorwave.title = 'Distractor'
+            distractorwave.x = EEGdist.times
+            distractorwave.y = EEGdist.data[outputchannels.index('HOTSPOT')]
+            distractorwave.linestyle='solid'
+            distractorwave.linecolor= '#A91CD4'
+            distractorwave.lineweight=2
+            # snag egghead
+            [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
+            distractoregg = eegpipe.eggheadplotprep()
+            distractoregg.title = 'Distractor'
+            distractoregg.channels = outputchannels
+            distractoregg.amplitudes = outputamplitude 
+            distractoregg.scale = [1, 9]
+            distractoregg.steps = 256
+            distractoregg.opacity = 0.2  
+            # place in bar
+            Orientation = eegpipe.barplotprep()
+            Orientation.title = 'Orientation'
+            Orientation.labels = ['Distractor']
+            Orientation.values = outputamplitude[outputchannels.index('HOTSPOT')]
+            Orientation.scale = [0, 20]
+            Orientation.biggerisbetter = True
+            Orientation.unit = ' microV'
+            barchunks.append(Orientation)
+            
+            
         # Target stimulus - 20
         EEGtarg = None
         try:
@@ -139,6 +184,7 @@ if __name__ == "__main__":
             EEGtarg = eegpipe.simplezwave(EEGtarg, BaselineWindow = [-0.500, 0.0])
             EEGtarg = eegpipe.simpleaverage(EEGtarg, Approach = 'Mean')
             eegpipe.saveset(EEGtarg, task.outputfile.split('.')[0] + '_Target.erp')
+            EEGtarg = eegpipe.collapsechannels(EEGtarg, Channels = ['C3', 'CZ', 'C4', 'CPZ', 'PZ', 'POZ'], NewChannelName='HOTSPOT', Approach='median')
         except:
             EEGtarg = None
         
@@ -150,7 +196,7 @@ if __name__ == "__main__":
             targetwave = eegpipe.waveformplotprep()
             targetwave.title = 'Target'
             targetwave.x = EEGtarg.times
-            targetwave.y = EEGtarg.data[outputchannels.index('PZ')]
+            targetwave.y = EEGtarg.data[outputchannels.index('HOTSPOT')]
             targetwave.linestyle='solid'
             targetwave.linecolor= '#2A60EB'
             targetwave.lineweight=2
@@ -163,41 +209,25 @@ if __name__ == "__main__":
             targetegg.scale = [1, 9]
             targetegg.steps = 256
             targetegg.opacity = 0.2  
+            # place in bar
+            Attention = eegpipe.barplotprep()
+            Attention.title = 'Attention'
+            Attention.labels = ['Target']
+            Attention.values = outputamplitude[outputchannels.index('HOTSPOT')]
+            Attention.scale = [0, 20]
+            Attention.biggerisbetter = True
+            Attention.unit = ' microV'
+            barchunks.append(Attention)
             
-        # Distractor stimulus - 30
-        EEGdist = None
-        try:
-            EEGdist = eegpipe.simpleepoch(EEG, Window = [-0.500, 1.000], Types = [30, 10030])
-            EEGdist = eegpipe.simplebaselinecorrect(EEGdist, Window = [-0.100, 0.0])
-            EEGdist = eegpipe.voltagethreshold(EEGdist, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGdist = eegpipe.simplefilter(EEGdist, Design = 'savitzky-golay', Order = 4)
-            EEGdist = eegpipe.simplezwave(EEGdist, BaselineWindow = [-0.500, 0.0])
-            EEGdist = eegpipe.simpleaverage(EEGdist, Approach = 'Mean')
-            eegpipe.saveset(EEGdist, task.outputfile.split('.')[0] + '_Distractor.erp')
-        except:
-            EEGdist = None
-            
-        if EEGdist != None:
-            [outputamplitude, outputlatency] = eegpipe.extractpeaks(EEGdist, Window=[0.300, 0.700], Points=9)
-            outputamplitude = eegpipe.extractamplitude(EEGdist, Window=[0.300, 0.700], Approach='mean')
-            outputchannels = [x.strip() for x in task.unicornchannels.split(',')[0:8]]
-            # snag waveform
-            distractorwave = eegpipe.waveformplotprep()
-            distractorwave.title = 'Distractor'
-            distractorwave.x = EEGdist.times
-            distractorwave.y = EEGdist.data[outputchannels.index('PZ')]
-            distractorwave.linestyle='solid'
-            distractorwave.linecolor= '#A91CD4'
-            distractorwave.lineweight=2
-            # snag egghead
-            [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
-            distractoregg = eegpipe.eggheadplotprep()
-            distractoregg.title = 'Distractor'
-            distractoregg.channels = outputchannels
-            distractoregg.amplitudes = outputamplitude 
-            distractoregg.scale = [1, 9]
-            distractoregg.steps = 256
-            distractoregg.opacity = 0.2   
+            Processing = eegpipe.barplotprep()
+            Processing.title = 'Processing'
+            Processing.labels = ['Target']
+            Processing.values = outputlatency[outputchannels.index('HOTSPOT')]
+            Processing.scale = [0.300, 0.700]
+            Processing.biggerisbetter = False
+            Processing.unit = ' ms'
+            barchunks.append(Processing)
+             
         
         # creates a stimulus locked model ERP.
         [outsum, outvect, xtime] = eegpipe.createsignal(
@@ -216,6 +246,7 @@ if __name__ == "__main__":
         Reference.linestyle='dashed'
         Reference.linecolor= '#768591'
         Reference.lineweight=0.5
+               
         
         # place structures      
         eggchunk = [targetegg, distractoregg]
