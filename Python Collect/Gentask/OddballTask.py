@@ -148,21 +148,30 @@ if __name__ == "__main__":
             outputchannels = EEGdist.channels
             # snag waveform
             distractorwave = eegpipe.waveformplotprep()
-            distractorwave.title = 'Distractor'
+            distractorwave.title = 'Orientation'
             distractorwave.x = EEGdist.times
             distractorwave.y = EEGdist.data[outputchannels.index('HOTSPOT')]
             distractorwave.linestyle='solid'
             distractorwave.linecolor= '#A91CD4'
             distractorwave.lineweight=2
+            if wavechunk == None:
+                wavechunk = [distractorwave]
+            else: 
+                wavechunk.append(distractorwave)
+            
             # snag egghead
             [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
             distractoregg = eegpipe.eggheadplotprep()
-            distractoregg.title = 'Distractor'
+            distractoregg.title = 'Orientation'
             distractoregg.channels = outputchannels
             distractoregg.amplitudes = outputamplitude 
             distractoregg.scale = [1, 9]
             distractoregg.steps = 256
-            distractoregg.opacity = 0.2  
+            distractoregg.opacity = 0.2 
+            if eggchunk == None:
+                eggchunk = [distractoregg]
+            else: 
+                eggchunk.append(distractoregg)  
             # place in bar
             Orientation = eegpipe.barplotprep()
             Orientation.title = 'Orientation'
@@ -194,21 +203,29 @@ if __name__ == "__main__":
             outputchannels = EEGtarg.channels
             # snag waveform
             targetwave = eegpipe.waveformplotprep()
-            targetwave.title = 'Target'
+            targetwave.title = 'Attention'
             targetwave.x = EEGtarg.times
             targetwave.y = EEGtarg.data[outputchannels.index('HOTSPOT')]
             targetwave.linestyle='solid'
             targetwave.linecolor= '#2A60EB'
             targetwave.lineweight=2
+            if wavechunk == None:
+                wavechunk = [targetwave]
+            else: 
+                wavechunk.append(targetwave)
             # snag egghead
             [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
             targetegg = eegpipe.eggheadplotprep()
-            targetegg.title = 'Target'
+            targetegg.title = 'Attention'
             targetegg.channels = outputchannels
             targetegg.amplitudes = outputamplitude  
             targetegg.scale = [1, 9]
             targetegg.steps = 256
-            targetegg.opacity = 0.2  
+            targetegg.opacity = 0.2 
+            if eggchunk == None:
+                eggchunk = [targetegg]
+            else: 
+                eggchunk.append(targetegg) 
             # place in bar
             Attention = eegpipe.barplotprep()
             Attention.title = 'Attention'
@@ -227,30 +244,30 @@ if __name__ == "__main__":
             Processing.biggerisbetter = False
             Processing.unit = ' ms'
             barchunks.append(Processing)
-             
         
-        # creates a stimulus locked model ERP.
-        [outsum, outvect, xtime] = eegpipe.createsignal(
-             Window = [-0.1, 1.0],
-             Latency =   [ 0.08,  0.25, 0.35],
-             Amplitude = [-0.1,  -0.45, 0.50],
-             Width =     [40,       80,  180],
-             Shape =     [0,         0,    0],
-             Smoothing = [0,         0,    0],
-             OverallSmooth = 20, 
-             Srate = 250.0)
-        Reference = eegpipe.waveformplotprep()
-        Reference.title = 'Reference'
-        Reference.x = xtime
-        Reference.y = numpy.multiply(outsum,8)
-        Reference.linestyle='dashed'
-        Reference.linecolor= '#768591'
-        Reference.lineweight=0.5
+            # creates a stimulus locked model ERP.
+            [outsum, outvect, xtime] = eegpipe.createsignal(
+                 Window = [-0.1, 1.0],
+                 Latency =   [ 0.08,  0.25, 0.35],
+                 Amplitude = [-0.1,  -0.45, 0.50],
+                 Width =     [40,       80,  180],
+                 Shape =     [0,         0,    0],
+                 Smoothing = [0,         0,    0],
+                 OverallSmooth = 20, 
+                 Srate = 250.0)
+            Reference = eegpipe.waveformplotprep()
+            Reference.title = 'Reference'
+            Reference.x = xtime
+            Reference.y = numpy.multiply(outsum,8)
+            Reference.linestyle='dashed'
+            Reference.linecolor= '#768591'
+            Reference.lineweight=0.5
+            if wavechunk == None:
+                wavechunk = [Reference]
+            else: 
+                wavechunk.append(Reference)
                
         
-        # place structures      
-        eggchunk = [targetegg, distractoregg]
-        wavechunk = [Reference, targetwave, distractorwave]
         
     eegpipe.reportingwindow(eggs=eggchunk, waveforms=wavechunk, bars=barchunks, fileout = task.outputfile.split('.')[0] + '.png')
 
