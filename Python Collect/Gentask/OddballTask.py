@@ -109,7 +109,27 @@ if __name__ == "__main__":
     Accuracy.biggerisbetter = True
     Accuracy.unit = ' %'
     
-    barchunks = [Speed, Consistency, Accuracy]
+    # d prime
+    HR = numpy.divide(datapull[2][0],100)
+    if HR > 0.99: 
+        HR = 0.99
+    if HR < 0.01: 
+        HR = 0.01
+    FA = numpy.subtract(1, numpy.divide(datapull[2][1],100))
+    if FA > 0.99: 
+        FA = 0.99
+    if FA < 0.01: 
+        FA = 0.01
+    dprime = numpy.subtract(scipy.stats.norm.ppf(HR), scipy.stats.norm.ppf(FA))
+    Prime = eegpipe.barplotprep()
+    Prime.title = 'Dprime'
+    Prime.labels = ['Dprime']
+    Prime.values = [dprime]
+    Prime.scale = [-1, 4.65]
+    Prime.biggerisbetter = True
+    Prime.unit = ''
+    
+    barchunks = [Speed, Consistency, Accuracy, Prime]
     
     
     
