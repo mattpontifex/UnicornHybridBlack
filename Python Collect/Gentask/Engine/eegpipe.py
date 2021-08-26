@@ -1245,7 +1245,8 @@ def extractamplitude(EEG, Window=False, Approach=False):
                 
     return outputvalues
 
-def extractpeaks(EEG, Window=False, Points=False):
+def extractpeaks(EEG, Window=False, Points=False, Direction=False):
+    Direction = checkdefaultsettings(Approach, ['max', 'min'])
     
     if Points == False:
         Points = 9
@@ -1269,7 +1270,11 @@ def extractpeaks(EEG, Window=False, Points=False):
                 maxthresh = 0.99
                 outpoint = []
                 while len(outpoint) == 0:
-                    outpoint = peakutils.indexes(EEG.data[cC][cE][startindex:stopindex], thres=float(maxthresh), min_dist=int(Points))
+                    searchdata = EEG.data[cC][cE][startindex:stopindex]                    
+                    if Direction == 'min':
+                        searchdata = numpy.multiply(searchdata, -1)
+                            
+                    outpoint = peakutils.indexes(searchdata, thres=float(maxthresh), min_dist=int(Points))
                     maxthresh = numpy.subtract(maxthresh, 0.01)
                     if (maxthresh < 0.5):
                         outpoint = [0]              
@@ -1284,7 +1289,12 @@ def extractpeaks(EEG, Window=False, Points=False):
             maxthresh = 0.99
             outpoint = []
             while len(outpoint) == 0:
-                outpoint = peakutils.indexes(EEG.data[cC][startindex:stopindex], thres=float(maxthresh), min_dist=int(Points))
+                
+                searchdata = EEG.data[cC][startindex:stopindex]                    
+                if Direction == 'min':
+                    searchdata = numpy.multiply(searchdata, -1)
+
+                outpoint = peakutils.indexes(searchdata, thres=float(maxthresh), min_dist=int(Points))
                 maxthresh = numpy.subtract(maxthresh, 0.01)
                 if (maxthresh < 0.5):
                     outpoint = [0]
