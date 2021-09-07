@@ -54,7 +54,7 @@ if __name__ == "__main__":
     task.unicorn = 'UN-2019.05.51' # [] if using other system
     #task.unicornchannels = 'FZ, CP1, CPZ, CP2, P1, PZ, P2, OZ, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
     task.unicornchannels = 'FZ, FCZ, C3, CZ, C4, CPZ, PZ, POZ, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
-    task.unicornrequired = False
+    task.unicornrequired = True
     
     # Begin the Task
     task.start()
