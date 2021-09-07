@@ -1020,7 +1020,10 @@ def readUnicornBlack(inputfile):
         
         # see if there is behavioral data available
         if (os.path.isfile(head + os.path.sep + tail.split('.')[0] + '.psydat')): 
-            EEG = mergetaskperformance(EEG, head + os.path.sep + tail.split('.')[0] + '.psydat')
+            try:
+                EEG = mergetaskperformance(EEG, head + os.path.sep + tail.split('.')[0] + '.psydat')
+            except:
+                pass
     
         return EEG
     
@@ -1053,81 +1056,101 @@ def mergetaskperformance(EEG, filein):
             if len(stimlistvalue) > 0:
                 stimlistindex = [i for i,v in enumerate(OUTEEG.events[0]) if v > 0]
                 
-                # cycle through event lines
-                currenteventplace = 0
+                psydatlistvalue = []
+                psydatlistindex = []
                 for dinfo in range(6, len(dcontents)):
                     currentline = dcontents[dinfo].split()
                     # make sure it is not the end of the file
                     if not 'taskruntime' in currentline[0]:
                         # make sure that it is an event we want marked
-                        if float(currentline[labline.index('Type')]) != 0:
+                        if not ((float(currentline[labline.index('Type')]) == 0) or (str(currentline[labline.index('Type')]) == 'nan')):
                             # make sure that it is a stimulus
                             if currentline[labline.index('Event')] == 'Stimulus':
-                                # find next event that meets this criteria - shouldnt have to though
-                                while float(currentline[labline.index('Type')]) != float(stimlistvalue[currenteventplace]):
-                                    currenteventplace = currenteventplace + 1
-                                
-                                for lab in labline:
-                                    # find associated list
-                                    currentlabindex = OUTEEG.eventsegments.index(lab)
-                                    sampleindex = stimlistindex[currenteventplace]
-                                    
-                                    if lab in ['Trial','Duration','ISI','ITI','Correct','Latency','ClockLatency','MinRespWin','MaxRespWin']:
-                                        if currentline[labline.index(lab)] != 'nan':
-                                            OUTEEG.events[currentlabindex][sampleindex] = float(currentline[labline.index(lab)])
+                                psydatlistvalue.append(float(currentline[labline.index('Type')]))
+                                psydatlistindex.append(int(dinfo))
+                            
+                matchinglist = []
+                currentEEGeventplace = -1
+                for cDAT in range(0, len(psydatlistvalue)):
+                    templist = []
+                    if currentEEGeventplace < len(stimlistvalue):
+                        ceilingEEGeventplace = currentEEGeventplace + 3
+                        if ceilingEEGeventplace > len(stimlistvalue): 
+                            ceilingEEGeventplace = len(stimlistvalue)
+                        
+                        for cEEG in range((currentEEGeventplace+1), ceilingEEGeventplace):
+                            if float(psydatlistvalue[cDAT]) == float(stimlistvalue[cEEG]):
+                                currentEEGeventplace = cEEG
+                                templist.append(psydatlistindex[cDAT])
+                                templist.append(psydatlistvalue[cDAT])
+                                templist.append(stimlistindex[cEEG])
+                                templist.append(stimlistvalue[cEEG])
+                                matchinglist.append(templist)
+                                break
                 
-                                    if lab in ['Event','Resp','Stimulus']:
-                                        if currentline[labline.index(lab)] != 'nan':
-                                            OUTEEG.events[currentlabindex][sampleindex] = currentline[labline.index(lab)]
-                                
-                                # adjust stimulus type based on accuracy
-                                # Correct Trials are increased by 10,000 
-                                # Error of Commission Trials are increased by 50,000
-                                # Error of Omission Trials are increased by 60,000
-                                # (i.e., type 27 would become 10,027 if correct; 50,027 if an
-                                # incorrect response was made; and 60,027 if an incorrect
-                                # non-response occurred)
-                                if float(currentline[labline.index('Correct')]) == float(1.0):
-                                    # correct trial
-                                    OUTEEG.events[0][sampleindex] = numpy.sum([OUTEEG.events[0][sampleindex], 10000])
-                                elif float(currentline[labline.index('Correct')]) == float(0.0):
-                                    # error trial
-                                    if currentline[labline.index('Resp')] == 'nan':
-                                        # error of omission
-                                        OUTEEG.events[0][sampleindex] = numpy.sum([OUTEEG.events[0][sampleindex], 60000])
-                                    else:
-                                        # error of comission
-                                        OUTEEG.events[0][sampleindex] = numpy.sum([OUTEEG.events[0][sampleindex], 50000])
-                                
-                                # add response event information
-                                # Correct Response are 2500
-                                # Error of Commission Resonse are 3500
-                                if currentline[labline.index('Resp')] != 'nan':
-                                    if currentline[labline.index('Latency')] != 'nan':
-                                        
-                                        # RT in ms / 1000 times the sample rate gives you the number of samples
-                                        backsample = int(numpy.floor(numpy.multiply(numpy.divide(float(currentline[labline.index('Latency')]),1000), float(OUTEEG.srate))))
-                                        boolnumeric = True
-                                        try:
-                                            float(currentline[labline.index('Resp')])
-                                        except:
-                                            boolnumeric = False
-                                        
-                                        if float(currentline[labline.index('Correct')]) == float(1.0):
-                                            if boolnumeric:
-                                                OUTEEG.events[0][sampleindex+backsample] = numpy.add(float(currentline[labline.index('Resp')]), float(1190.0))
-                                            else:
-                                                OUTEEG.events[0][sampleindex+backsample] = float(1191.0)
-                                        else:
-                                            if boolnumeric:
-                                                OUTEEG.events[0][sampleindex+backsample] = numpy.add(float(currentline[labline.index('Resp')]), float(2190.0))
-                                            else:
-                                                OUTEEG.events[0][sampleindex+backsample] = float(2191.0)
-                                        OUTEEG.events[OUTEEG.eventsegments.index('Event')][sampleindex+backsample] = 'Response'
-                                        OUTEEG.events[OUTEEG.eventsegments.index('Trial')][sampleindex+backsample] = float(currentline[labline.index('Trial')])
+                # cycle through 
+                for cE in range(0, len(matchinglist)):
+                    # snag line
+                    currentline = dcontents[matchinglist[cE][0]].split()
+                    sampleindex = matchinglist[cE][2]
+                    for lab in labline:
+                        # find associated list
+                        currentlabindex = OUTEEG.eventsegments.index(lab)
                                     
-                                # increment events to next mark
-                                currenteventplace = currenteventplace + 1
+                        if lab in ['Trial','Duration','ISI','ITI','Correct','Latency','ClockLatency','MinRespWin','MaxRespWin']:
+                            if currentline[labline.index(lab)] != 'nan':
+                                OUTEEG.events[currentlabindex][sampleindex] = float(currentline[labline.index(lab)])
+    
+                        if lab in ['Event','Resp','Stimulus']:
+                            if currentline[labline.index(lab)] != 'nan':
+                                OUTEEG.events[currentlabindex][sampleindex] = currentline[labline.index(lab)]
+                
+                        # adjust stimulus type based on accuracy
+                        # Correct Trials are increased by 10,000 
+                        # Error of Commission Trials are increased by 50,000
+                        # Error of Omission Trials are increased by 60,000
+                        # (i.e., type 27 would become 10,027 if correct; 50,027 if an
+                        # incorrect response was made; and 60,027 if an incorrect
+                        # non-response occurred)
+                        if float(currentline[labline.index('Correct')]) == float(1.0):
+                            # correct trial
+                            OUTEEG.events[0][sampleindex] = numpy.sum([OUTEEG.events[0][sampleindex], 10000])
+                        elif float(currentline[labline.index('Correct')]) == float(0.0):
+                            # error trial
+                            if currentline[labline.index('Resp')] == 'nan':
+                                # error of omission
+                                OUTEEG.events[0][sampleindex] = numpy.sum([OUTEEG.events[0][sampleindex], 60000])
+                            else:
+                                # error of comission
+                                OUTEEG.events[0][sampleindex] = numpy.sum([OUTEEG.events[0][sampleindex], 50000])
+                        
+                        # add response event information
+                        # Correct Response are 2500
+                        # Error of Commission Resonse are 3500
+                        if currentline[labline.index('Resp')] != 'nan':
+                            if currentline[labline.index('Latency')] != 'nan':
+                                
+                                # RT in ms / 1000 times the sample rate gives you the number of samples
+                                backsample = int(numpy.floor(numpy.multiply(numpy.divide(float(currentline[labline.index('Latency')]),1000), float(OUTEEG.srate))))
+                                boolnumeric = True
+                                try:
+                                    float(currentline[labline.index('Resp')])
+                                except:
+                                    boolnumeric = False
+                                
+                                if float(currentline[labline.index('Correct')]) == float(1.0):
+                                    if boolnumeric:
+                                        OUTEEG.events[0][sampleindex+backsample] = numpy.add(float(currentline[labline.index('Resp')]), float(1190.0))
+                                    else:
+                                        OUTEEG.events[0][sampleindex+backsample] = float(1191.0)
+                                else:
+                                    if boolnumeric:
+                                        OUTEEG.events[0][sampleindex+backsample] = numpy.add(float(currentline[labline.index('Resp')]), float(2190.0))
+                                    else:
+                                        OUTEEG.events[0][sampleindex+backsample] = float(2191.0)
+                                OUTEEG.events[OUTEEG.eventsegments.index('Event')][sampleindex+backsample] = 'Response'
+                                OUTEEG.events[OUTEEG.eventsegments.index('Trial')][sampleindex+backsample] = float(currentline[labline.index('Trial')])
+                            
         
         return OUTEEG
     else:
@@ -1246,7 +1269,7 @@ def extractamplitude(EEG, Window=False, Approach=False):
     return outputvalues
 
 def extractpeaks(EEG, Window=False, Points=False, Direction=False):
-    Direction = checkdefaultsettings(Approach, ['max', 'min'])
+    Direction = checkdefaultsettings(Direction, ['max', 'min'])
     
     if Points == False:
         Points = 9
