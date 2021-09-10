@@ -1105,52 +1105,52 @@ def mergetaskperformance(EEG, filein):
                             if currentline[labline.index(lab)] != 'nan':
                                 OUTEEG.events[currentlabindex][sampleindex] = currentline[labline.index(lab)]
                 
-                        # adjust stimulus type based on accuracy
-                        # Correct Trials are increased by 10,000 
-                        # Error of Commission Trials are increased by 50,000
-                        # Error of Omission Trials are increased by 60,000
-                        # (i.e., type 27 would become 10,027 if correct; 50,027 if an
-                        # incorrect response was made; and 60,027 if an incorrect
-                        # non-response occurred)
-                        if float(currentline[labline.index('Correct')]) == float(1.0):
-                            # correct trial
-                            OUTEEG.events[0][sampleindex] = numpy.sum([OUTEEG.events[0][sampleindex], 10000])
-                        elif float(currentline[labline.index('Correct')]) == float(0.0):
-                            # error trial
-                            if currentline[labline.index('Resp')] == 'nan':
-                                # error of omission
-                                OUTEEG.events[0][sampleindex] = numpy.sum([OUTEEG.events[0][sampleindex], 60000])
-                            else:
-                                # error of comission
-                                OUTEEG.events[0][sampleindex] = numpy.sum([OUTEEG.events[0][sampleindex], 50000])
-                        
-                        # add response event information
-                        # Correct Response are 2500
-                        # Error of Commission Resonse are 3500
-                        if currentline[labline.index('Resp')] != 'nan':
-                            if currentline[labline.index('Latency')] != 'nan':
-                                
-                                # RT in ms / 1000 times the sample rate gives you the number of samples
-                                backsample = int(numpy.floor(numpy.multiply(numpy.divide(float(currentline[labline.index('Latency')]),1000), float(OUTEEG.srate))))
-                                boolnumeric = True
-                                try:
-                                    float(currentline[labline.index('Resp')])
-                                except:
-                                    boolnumeric = False
-                                
-                                if float(currentline[labline.index('Correct')]) == float(1.0):
-                                    if boolnumeric:
-                                        OUTEEG.events[0][sampleindex+backsample] = numpy.add(float(currentline[labline.index('Resp')]), float(1190.0))
-                                    else:
-                                        OUTEEG.events[0][sampleindex+backsample] = float(1191.0)
-                                else:
-                                    if boolnumeric:
-                                        OUTEEG.events[0][sampleindex+backsample] = numpy.add(float(currentline[labline.index('Resp')]), float(2190.0))
-                                    else:
-                                        OUTEEG.events[0][sampleindex+backsample] = float(2191.0)
-                                OUTEEG.events[OUTEEG.eventsegments.index('Event')][sampleindex+backsample] = 'Response'
-                                OUTEEG.events[OUTEEG.eventsegments.index('Trial')][sampleindex+backsample] = float(currentline[labline.index('Trial')])
+                    # adjust stimulus type based on accuracy
+                    # Correct Trials are increased by 10,000 
+                    # Error of Commission Trials are increased by 50,000
+                    # Error of Omission Trials are increased by 60,000
+                    # (i.e., type 27 would become 10,027 if correct; 50,027 if an
+                    # incorrect response was made; and 60,027 if an incorrect
+                    # non-response occurred)
+                    if float(currentline[labline.index('Correct')]) == float(1.0):
+                        # correct trial
+                        OUTEEG.events[0][sampleindex] = numpy.sum([OUTEEG.events[0][sampleindex], 10000])
+                    elif float(currentline[labline.index('Correct')]) == float(0.0):
+                        # error trial
+                        if currentline[labline.index('Resp')] == 'nan':
+                            # error of omission
+                            OUTEEG.events[0][sampleindex] = numpy.sum([OUTEEG.events[0][sampleindex], 60000])
+                        else:
+                            # error of comission
+                            OUTEEG.events[0][sampleindex] = numpy.sum([OUTEEG.events[0][sampleindex], 50000])
+                   
+                    # add response event information
+                    # Correct Response are 1190
+                    # Error of Commission Resonse are 2190
+                    if currentline[labline.index('Resp')] != 'nan':
+                        if currentline[labline.index('Latency')] != 'nan':
                             
+                            # RT in ms / 1000 times the sample rate gives you the number of samples
+                            backsample = int(numpy.floor(numpy.multiply(numpy.divide(float(currentline[labline.index('Latency')]),1000), float(OUTEEG.srate))))
+                            boolnumeric = True
+                            try:
+                                float(currentline[labline.index('Resp')])
+                            except:
+                                boolnumeric = False
+                            
+                            if float(currentline[labline.index('Correct')]) == float(1.0):
+                                if boolnumeric:
+                                    OUTEEG.events[0][sampleindex+backsample] = numpy.add(float(currentline[labline.index('Resp')]), float(1190.0))
+                                else:
+                                    OUTEEG.events[0][sampleindex+backsample] = float(1191.0)
+                            else:
+                                if boolnumeric:
+                                    OUTEEG.events[0][sampleindex+backsample] = numpy.add(float(currentline[labline.index('Resp')]), float(2190.0))
+                                else:
+                                    OUTEEG.events[0][sampleindex+backsample] = float(2191.0)
+                            OUTEEG.events[OUTEEG.eventsegments.index('Event')][sampleindex+backsample] = 'Response'
+                            OUTEEG.events[OUTEEG.eventsegments.index('Trial')][sampleindex+backsample] = float(currentline[labline.index('Trial')])
+                        
         
         return OUTEEG
     else:
@@ -2899,7 +2899,7 @@ def wavesubplot(waves, scale=None, ax=None, colorscale=None, positivedown=False)
     matplotlib.pyplot.legend();
         
 
-def barsubplot(values, scale, ax=None, width=None, colorscale=None, units=None, title=None, labels=None, plotvalue=True, biggerisbetter=True, alternatelabelsat=3):
+def barsubplot(values, scale, ax=None, width=None, colorscale=None, units=None, title=None, labels=None, plotvalue=True, biggerisbetter=True, alternatelabelsat=3, axfontsize=16, labelfontsize=16, valuefontsize=10):
     #barsubplot(values = [700, numpy.nan, 60], scale = [80, 600], biggerisbetter = False, labels = ['Target', 'Nontarget', 'Reference'], units = ' ms', title = 'Speed', plotvalue = True, colorscale = None, width = 0.4)
     
     if title == None:
@@ -2982,7 +2982,7 @@ def barsubplot(values, scale, ax=None, width=None, colorscale=None, units=None, 
     
     #ax.patch.set_facecolor('#FFFFFF')
     
-    ax.set_title(title, color='black', fontweight='bold', fontsize=16)
+    ax.set_title(title, color='black', fontweight='bold', fontsize=axfontsize)
     x_pos = numpy.arange(len(values))
     
     # plot scaled values
@@ -3002,11 +3002,11 @@ def barsubplot(values, scale, ax=None, width=None, colorscale=None, units=None, 
                 else:
                     alternator = True
             
-            ax.text(subxloc, subyloc, str(labels[cT]), color='black', fontweight='bold', fontsize=16, ha='center', va='center')
+            ax.text(subxloc, subyloc, str(labels[cT]), color='black', fontweight='bold', fontsize=labelfontsize, ha='center', va='center')
         
             if plotvalue:
                 tempstringout = str(round(values[cT],1)) + units
-                ax.text(subxloc, numpy.add(scaledvalues[cT],2), tempstringout, color='black', fontweight='bold', fontsize=10, ha='center', va='center')
+                ax.text(subxloc, numpy.add(scaledvalues[cT],2), tempstringout, color='black', fontweight='bold', fontsize=valuefontsize, ha='center', va='center')
         
 
 
@@ -3096,9 +3096,24 @@ def reportingwindow(eggs=None, waveforms=None, bars=None, alternatelabelsat=2, c
             nrow = 1;
             ncol = len(bars)
             axbar = ax[1, 0:2].subgridspec(nrow, ncol, wspace=0.4, hspace=0.0)
+            
+            axfontsize=16
+            if ncol > 5:
+                axfontsize = axfontsize-3
+                
+            labelfontsize=16
+            if ncol > 5:
+                labelfontsize=labelfontsize-4
+            if len(bars[cA].values) > 2:
+                labelfontsize=labelfontsize-4
+                
+            valuefontsize=10
+            if ncol > 5:
+                valuefontsize=valuefontsize-2
+            
             for cA in range(len(bars)):
                 axbarsub = fig.add_subplot(axbar[0, cA])    
-                barsubplot(values = bars[cA].values, scale = bars[cA].scale, ax = axbarsub, colorscale = None, biggerisbetter = bars[cA].biggerisbetter, labels = bars[cA].labels, units = bars[cA].unit, title = bars[cA].title, plotvalue = True, alternatelabelsat=alternatelabelsat)
+                barsubplot(values = bars[cA].values, scale = bars[cA].scale, ax = axbarsub, colorscale = None, biggerisbetter = bars[cA].biggerisbetter, labels = bars[cA].labels, units = bars[cA].unit, title = bars[cA].title, plotvalue = True, alternatelabelsat=alternatelabelsat, axfontsize=axfontsize, labelfontsize=labelfontsize, valuefontsize=valuefontsize)
             
         if fileout != None:
             matplotlib.pyplot.savefig(fileout, dpi=90, transparent=False, bbox_inches=None, pad_inches=0.1, frameon=None, metadata=None)
