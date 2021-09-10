@@ -5,7 +5,7 @@ from Engine.basicstimuluspresentationengine import Engine
 import Engine.generatesequence as generatesequence
 import Engine.eegpipe as eegpipe
 import numpy
-import scipy.stats
+import scipy
 
 if __name__ == "__main__":
     # Unicorn multiprocessing will not run in Spyder 
@@ -14,60 +14,17 @@ if __name__ == "__main__":
     # Select the checkbox for External system terminal Interact with the Python console after execution
     
     task = Engine()
-    
-    # Instructions
-    task.instructioncard = ['SNBp1.png', 'SNBp2.png', 'SNBp3.png', 'SNBp4.png', 'SNBp5.png', 'SNBp6.png', 'SNBp7.png']
-    task.showinstructions = True
-    
-    # Sequence File
-    generatesequence.createnbacksequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, style = 1, back = 2, parameters = [500, 100, 2450, 2500, ['z','m']], feedback = [80, 0, 1, 1, 1, 1])
-    task.sequence = 'randomsequence.csv'
-    
-    # Filename Prefix and Suffix
-    task.prefix = 'NB'
-    task.suffix = ''
-    task.filenametooltip = 'Format: ### Remember to add condition after the ID.'
-    task.testblock = False
-    
-    # Global image frame/mask
-    task.permanentframemask = 'SNB6grid.png'
-    
-    # Usable keys during task
-    task.participantkeys = ['1', '4', 'enter', 'z', 'm']
-    
-    # Experiment Flow Settings
-    task.pauseatstart = False # Only Experimentor can advance to the task after the instructions
-    task.delaybeforestart = 5 # Seconds between end of instructions and beginning of task
-    task.pauseatend = False
-    
-    # Modify Screen Settings for Participant
-    task.participantmonitor.displaynumber = 0 # Monitor Number
-    task.participantmonitor.resolution = (1920, 1080)
-    task.participantmonitor.physicalsize = (53,30) # physical screen size in centimeters
-    task.participantmonitor.backgroundcolor = '#787878' # RGB Codes (-1 to 1) or Hex Code
-    task.participantmonitor.forgroundcolor = '#FFFFFF' # RGB Codes (-1 to 1) or Hex Code
-    
-    # Event Triggers
-    task.triggers = True
-    task.markfirstresponseonly = True
-    task.unicorn = 'UN-2019.05.51' # [] if using other system
-    #task.unicornchannels = 'FZ, CP1, CPZ, CP2, P1, PZ, P2, OZ, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
-    task.unicornchannels = 'FZ, FCZ, C3, CZ, C4, CPZ, PZ, POZ, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
-    task.unicornrequired = True
-    
-    # Begin the Task
-    task.start()
-    
-    
-    
-    
+    print(task.outputfile)
+    task.outputfile = r'Raw\NBmatt.psydat'
+    task.finished = True
+
     
     
     ###### Post task options ######################################################################################
     
     
     ### Pull behavioral performance
-    #task.outputfile = 'Raw\OBReportTest.psydat'
+    #task.outputfile = 'Raw\NBmatt.psydat'
     
     # Check Performance Settings using xcat
     datapull = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
