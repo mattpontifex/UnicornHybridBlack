@@ -18,7 +18,7 @@ if __name__ == "__main__":
     task.showinstructions = True
     
     # Sequence File
-    generatesequence.createnbacksequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, style = 3, back = 2, parameters = [1400, 100, 1450, 1500, ['s','d','f','j','k','l']], feedback = [80, 0, 1, 1, 0, 1])
+    generatesequence.createnbacksequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, style = 3, back = 2, parameters = [1480, 100, 1480, 1500, ['s','d','f','j','k','l']], feedback = [80, 0, 1, 1, 0, 1])
     task.sequence = 'randomsequence.csv'
     
     # Filename Prefix and Suffix
@@ -173,7 +173,7 @@ if __name__ == "__main__":
             Monitoring.unit = ' microV'
             barchunks.append(Monitoring)
         
-    eegpipe.reportingwindow(eggs=eggchunk, waveforms=wavechunk, bars=barchunks)
+    eegpipe.reportingwindow(eggs=eggchunk, waveforms=wavechunk, bars=barchunks, fileout = task.outputfile.split('.')[0] + '.png')
     # Backup data
     #filesync.pushfiles(inpath = '\\Studies\Raw', outpath = 'Z:\Studies\Raw', file_types = ['.psydat', '.tsv', '.tsve', '.csv', '.csve'])
     

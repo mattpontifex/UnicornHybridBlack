@@ -52,7 +52,8 @@ if __name__ == "__main__":
     task.markfirstresponseonly = True
     task.unicorn = 'UN-2019.05.51' # [] if using other system
     #task.unicornchannels = 'FZ, CP1, CPZ, CP2, P1, PZ, P2, OZ, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
-    task.unicornchannels = 'FZ, FCZ, C3, CZ, C4, CPZ, PZ, POZ, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
+    #task.unicornchannels = 'FZ, FCZ, C3, CZ, C4, CPZ, PZ, POZ, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
+    task.unicornchannels = 'FC1, FC2, C3, C4, CPZ, P1, P2, POZ, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
     task.unicornrequired = True
     
     # Begin the Task
@@ -150,6 +151,7 @@ if __name__ == "__main__":
         #    boolfail = True
         EEG = eegpipe.simplefilter(EEG, Filter = 'Notch', Cutoff = [60.0])
         EEG = eegpipe.simplefilter(EEG, Filter = 'Bandpass', Design = 'Butter', Cutoff = [1.0, 25.0], Order=3)
+        eggscale = [1,0]
         
         # Target stimulus - 30 & 40
         EEGtarg = None
@@ -171,6 +173,7 @@ if __name__ == "__main__":
         if EEGtarg != None:
             [outputamplitude, outputlatency] = eegpipe.extractpeaks(EEGtarg, Window=[0.300, 0.700], Points=9)
             outputamplitude = eegpipe.extractamplitude(EEGtarg, Window=[0.300, 0.700], Approach='mean')
+            eggscale = eegpipe.determinerescale(eggscale, outputamplitude)
             outputchannels = EEGtarg.channels
             # snag waveform
             targetwave = eegpipe.waveformplotprep()
@@ -180,6 +183,8 @@ if __name__ == "__main__":
             targetwave.linestyle='solid'
             targetwave.linecolor= '#A91CD4'
             targetwave.lineweight=2
+            targetwave.fillbetween='ZeroP'
+            targetwave.fillwindow=[0.3,0.6]
             if wavechunk == None:
                 wavechunk = [targetwave]
             else: 
@@ -255,6 +260,7 @@ if __name__ == "__main__":
         if EEGresp != None:
             #[outputamplitude, outputlatency] = eegpipe.extractpeaks(EEGresp, Window=[0.300, 0.700], Points=9)
             outputamplitude = eegpipe.extractamplitude(EEGresp, Window=[-0.100, 0.100], Approach='mean')
+            eggscale = eegpipe.determinerescale(eggscale, outputamplitude)
             outputchannels = EEGresp.channels
             # snag waveform
             errorwave = eegpipe.waveformplotprep()
@@ -264,6 +270,8 @@ if __name__ == "__main__":
             errorwave.linestyle='solid'
             errorwave.linecolor= '#2A60EB'
             errorwave.lineweight=2
+            errorwave.fillbetween='ZeroN'
+            errorwave.fillwindow=[-0.1,0.2]
             if wavechunk == None:
                 wavechunk = [errorwave]
             else: 
@@ -290,6 +298,11 @@ if __name__ == "__main__":
             Monitoring.biggerisbetter = False
             Monitoring.unit = ' microV'
             barchunks.append(Monitoring)
+            
+        if eggchunk != None:
+            eggscale = eegpipe.centershift(eggscale)
+            for cA in range(len(eggchunk)):
+                eggchunk[cA].scale = eggscale
         
     eegpipe.reportingwindow(eggs=eggchunk, waveforms=wavechunk, bars=barchunks, fileout = task.outputfile.split('.')[0] + '.png')
 

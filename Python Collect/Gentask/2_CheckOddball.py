@@ -6,6 +6,8 @@ import Engine.generatesequence as generatesequence
 import Engine.eegpipe as eegpipe
 import numpy
 import scipy
+from tkinter import Tk     # from tkinter import Tk for Python 3.x
+from tkinter.filedialog import askopenfilename
 
 if __name__ == "__main__":
     # Unicorn multiprocessing will not run in Spyder 
@@ -14,10 +16,11 @@ if __name__ == "__main__":
     # Select the checkbox for External system terminal Interact with the Python console after execution
     
     task = Engine()
-    task.outputfile = 'Raw\OBmatt97.psydat'
     task.finished = True
-    
-    
+    Tk().withdraw() # we don't want a full GUI, so keep the root window from appearing
+    filename = askopenfilename()  # show an "Open" dialog box and return the path to the selected file
+    task.outputfile = filename.split('.')[0] + '.psydat'
+    #task.outputfile = r'Raw\OBLauren.psydat'
     
     
     ###### Post task options ######################################################################################
@@ -91,59 +94,43 @@ if __name__ == "__main__":
     # if the task finished then pull the data
     if task.finished:
         EEG = eegpipe.readUnicornBlack(task.outputfile.split('.')[0] + '.csv')
-        try:
-            EEG = eegpipe.mergetaskperformance(EEG, task.outputfile.split('.')[0] + '.psydat')
-        except:
-            boolfail = True
         EEG = eegpipe.simplefilter(EEG, Filter = 'Notch', Cutoff = [60.0])
-        EEG = eegpipe.simplefilter(EEG, Filter = 'Bandpass', Design = 'Butter', Cutoff = [1.0, 25.0], Order=3)
+        EEG = eegpipe.simplefilter(EEG, Filter = 'Bandpass', Design = 'Butter', Cutoff = [0.5, 30.0], Order=3)
+        
+        # creates a stimulus locked model ERP.
+        [outsum, outvect, xtime] = eegpipe.createsignal(
+             Window = [-0.1, 1.0],
+             Latency =   [ 0.08,  0.25, 0.35],
+             Amplitude = [-0.1,  -0.45, 0.50],
+             Width =     [40,       80,  180],
+             Shape =     [0,         0,    0],
+             Smoothing = [0,         0,    0],
+             OverallSmooth = 20, 
+             Srate = 250.0)
         
         # Distractor stimulus - 30
         EEGdist = None
         try:
-            EEGdist = eegpipe.simpleepoch(EEG, Window = [-0.500, 1.000], Types = [30, 10030])
+            EEGdist = eegpipe.simpleepoch(EEG, Window = [-0.100, 1.000], Types = [30, 10030])
             EEGdist = eegpipe.simplebaselinecorrect(EEGdist, Window = [-0.100, 0.0])
             EEGdist = eegpipe.voltagethreshold(EEGdist, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGdist = eegpipe.simplefilter(EEGdist, Design = 'savitzky-golay', Order = 4)
-            EEGdist = eegpipe.simplezwave(EEGdist, BaselineWindow = [-0.500, 0.0])
+            EEGdist = eegpipe.antiphasedetection(EEGdist, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ'], Template=outsum[eegpipe.closestidx(xtime, 0.200):eegpipe.closestidx(xtime, 0.800)])
+            EEGdist = eegpipe.antiphasedetection(EEGdist, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ'])
+            EEGdist = eegpipe.voltagethreshold(EEGdist, Threshold = [-100.0, 100.0], Step = 50.0)
+            EEGdist = eegpipe.netdeflectiondetection(EEGdist, Threshold=-10, Direction='negative', Window = [0.200, 0.800],Channel=['CZ', 'CPZ', 'PZ'])
+            EEGdist = eegpipe.simplefilter(EEGdist, Design = 'savitzky-golay', Order = 6)
+            # EEGdist = eegpipe.simplezwave(EEGdist, BaselineWindow = [-0.100, 0.000])
             EEGdist = eegpipe.simpleaverage(EEGdist, Approach = 'Mean')
-            eegpipe.saveset(EEGdist, task.outputfile.split('.')[0] + '_Distractor.erp')
             EEGdist = eegpipe.collapsechannels(EEGdist, Channels = ['C3', 'CZ', 'C4', 'CPZ', 'PZ', 'POZ'], NewChannelName='HOTSPOT', Approach='median')
             EEGdist = eegpipe.simplefilter(EEGdist, Design = 'savitzky-golay', Order = 4)
         except:
             EEGdist = None
             
         if EEGdist != None:
-            [outputamplitude, outputlatency] = eegpipe.extractpeaks(EEGdist, Window=[0.300, 0.700], Points=9)
-            outputamplitude = eegpipe.extractamplitude(EEGdist, Window=[0.300, 0.700], Approach='mean')
             outputchannels = EEGdist.channels
-            # snag waveform
-            distractorwave = eegpipe.waveformplotprep()
-            distractorwave.title = 'Orientation'
-            distractorwave.x = EEGdist.times
-            distractorwave.y = EEGdist.data[outputchannels.index('HOTSPOT')]
-            distractorwave.linestyle='solid'
-            distractorwave.linecolor= '#A91CD4'
-            distractorwave.lineweight=2
-            if wavechunk == None:
-                wavechunk = [distractorwave]
-            else: 
-                wavechunk.append(distractorwave)
             
-            # snag egghead
-            [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
-            distractoregg = eegpipe.eggheadplotprep()
-            distractoregg.title = 'Orientation'
-            distractoregg.channels = outputchannels
-            distractoregg.amplitudes = outputamplitude 
-            distractoregg.scale = [1, 9]
-            distractoregg.steps = 256
-            distractoregg.opacity = 0.2 
-            if eggchunk == None:
-                eggchunk = [distractoregg]
-            else: 
-                eggchunk.append(distractoregg)  
             # place in bar
+            [outputamplitude, outputlatency] = eegpipe.extractpeaks(EEGdist, Window=[0.300, 0.700], Points=9)
             Orientation = eegpipe.barplotprep()
             Orientation.title = 'Orientation'
             Orientation.labels = ['Distractor']
@@ -153,52 +140,65 @@ if __name__ == "__main__":
             Orientation.unit = ' microV'
             barchunks.append(Orientation)
             
+            # snag waveform
+            distractorwave = eegpipe.waveformplotprep()
+            distractorwave.title = 'Orientation'
+            distractorwave.x = EEGdist.times[eegpipe.closestidx(EEGdist.times, -0.100):eegpipe.closestidx(EEGdist.times, 1.000)]
+            distractorwave.y = EEGdist.data[outputchannels.index('HOTSPOT')][eegpipe.closestidx(EEGdist.times, -0.100):eegpipe.closestidx(EEGdist.times, 1.000)]
+            distractorwave.linestyle='solid'
+            distractorwave.linecolor= '#EF9A35'
+            distractorwave.lineweight=2
+            distractorwave.fillbetween='ZeroP'
+            distractorwave.fillwindow=[0.3,0.7]
+            distractorwave.fillbetweencolor='#EF9A35'
+            if wavechunk == None:
+                wavechunk = [distractorwave]
+            else: 
+                wavechunk.append(distractorwave)
+            
+            # snag egghead
+            #outputamplitude = eegpipe.extractamplitude(EEGdist, Window=[0.300, 0.600], Approach='mean')
+            [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
+            distractoregg = eegpipe.eggheadplotprep()
+            distractoregg.title = 'Orientation'
+            distractoregg.channels = outputchannels
+            distractoregg.amplitudes = outputamplitude 
+            distractoregg.scale = [0, 1]
+            if outputamplitude[outputchannels.index('HOTSPOT')] > distractoregg.scale[1]:
+                distractoregg.scale[1] = outputamplitude[outputchannels.index('HOTSPOT')]
+            distractoregg.opacity = 0.2 
+            if eggchunk == None:
+                eggchunk = [distractoregg]
+            else: 
+                eggchunk.append(distractoregg)  
+            
+            
+            
             
         # Target stimulus - 20
         EEGtarg = None
         try:
-            EEGtarg = eegpipe.simpleepoch(EEG, Window = [-0.500, 1.000], Types = [20, 10020])
+            EEGtarg = eegpipe.simpleepoch(EEG, Window = [-0.100, 1.000], Types = [20, 10020])
             EEGtarg = eegpipe.simplebaselinecorrect(EEGtarg, Window = [-0.100, 0.0])
             EEGtarg = eegpipe.voltagethreshold(EEGtarg, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGtarg = eegpipe.simplefilter(EEGtarg, Design = 'savitzky-golay', Order = 4)
-            EEGtarg = eegpipe.simplezwave(EEGtarg, BaselineWindow = [-0.500, 0.0])
+            
+            EEGtarg = eegpipe.antiphasedetection(EEGtarg, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ'], Template=outsum[eegpipe.closestidx(xtime, 0.200):eegpipe.closestidx(xtime, 0.800)])
+            EEGtarg = eegpipe.antiphasedetection(EEGtarg, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ'])
+            EEGtarg = eegpipe.voltagethreshold(EEGtarg, Threshold = [-100.0, 100.0], Step = 50.0)
+            EEGtarg = eegpipe.netdeflectiondetection(EEGtarg, Threshold=-10, Direction='negative', Window = [0.200, 0.800],Channel=['CZ', 'CPZ', 'PZ'])
+            EEGtarg = eegpipe.simplefilter(EEGtarg, Design = 'savitzky-golay', Order = 6)
+            #EEGtarg = eegpipe.simplezwave(EEGtarg, BaselineWindow = [-0.100, 0.000])
             EEGtarg = eegpipe.simpleaverage(EEGtarg, Approach = 'Mean')
-            eegpipe.saveset(EEGtarg, task.outputfile.split('.')[0] + '_Target.erp')
             EEGtarg = eegpipe.collapsechannels(EEGtarg, Channels = ['C3', 'CZ', 'C4', 'CPZ', 'PZ', 'POZ'], NewChannelName='HOTSPOT', Approach='median')
             EEGtarg = eegpipe.simplefilter(EEGtarg, Design = 'savitzky-golay', Order = 4)
         except:
             EEGtarg = None
         
         if EEGtarg != None:
-            [outputamplitude, outputlatency] = eegpipe.extractpeaks(EEGtarg, Window=[0.300, 0.700], Points=9)
-            outputamplitude = eegpipe.extractamplitude(EEGtarg, Window=[0.300, 0.700], Approach='mean')
             outputchannels = EEGtarg.channels
-            # snag waveform
-            targetwave = eegpipe.waveformplotprep()
-            targetwave.title = 'Attention'
-            targetwave.x = EEGtarg.times
-            targetwave.y = EEGtarg.data[outputchannels.index('HOTSPOT')]
-            targetwave.linestyle='solid'
-            targetwave.linecolor= '#2A60EB'
-            targetwave.lineweight=2
-            if wavechunk == None:
-                wavechunk = [targetwave]
-            else: 
-                wavechunk.append(targetwave)
-            # snag egghead
-            [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
-            targetegg = eegpipe.eggheadplotprep()
-            targetegg.title = 'Attention'
-            targetegg.channels = outputchannels
-            targetegg.amplitudes = outputamplitude  
-            targetegg.scale = [1, 9]
-            targetegg.steps = 256
-            targetegg.opacity = 0.2 
-            if eggchunk == None:
-                eggchunk = [targetegg]
-            else: 
-                eggchunk.append(targetegg) 
+            
             # place in bar
+            [outputamplitude, outputlatency] = eegpipe.extractpeaks(EEGtarg, Window=[0.300, 0.700], Points=9)
             Attention = eegpipe.barplotprep()
             Attention.title = 'Attention'
             Attention.labels = ['Target']
@@ -211,38 +211,62 @@ if __name__ == "__main__":
             Processing = eegpipe.barplotprep()
             Processing.title = 'Processing'
             Processing.labels = ['Target']
-            Processing.values = [outputlatency[outputchannels.index('HOTSPOT')]]
-            Processing.scale = [0.300, 0.700]
+            Processing.values = [numpy.multiply(outputlatency[outputchannels.index('HOTSPOT')],1000)]
+            Processing.scale = [300, 700]
             Processing.biggerisbetter = False
             Processing.unit = ' ms'
             barchunks.append(Processing)
-        
-            # creates a stimulus locked model ERP.
-            [outsum, outvect, xtime] = eegpipe.createsignal(
-                 Window = [-0.1, 1.0],
-                 Latency =   [ 0.08,  0.25, 0.35],
-                 Amplitude = [-0.1,  -0.45, 0.50],
-                 Width =     [40,       80,  180],
-                 Shape =     [0,         0,    0],
-                 Smoothing = [0,         0,    0],
-                 OverallSmooth = 20, 
-                 Srate = 250.0)
+            
+            # snag waveform
+            targetwave = eegpipe.waveformplotprep()
+            targetwave.title = 'Attention'
+            targetwave.x = EEGtarg.times[eegpipe.closestidx(EEGtarg.times, -0.100):eegpipe.closestidx(EEGtarg.times, 1.000)]
+            targetwave.y = EEGtarg.data[outputchannels.index('HOTSPOT')][eegpipe.closestidx(EEGtarg.times, -0.100):eegpipe.closestidx(EEGtarg.times, 1.000)]
+            targetwave.linestyle='solid'
+            targetwave.linecolor= '#3D5E73'
+            targetwave.lineweight=2
+            targetwave.fillbetween='ZeroP'
+            targetwave.fillwindow=[0.3,0.6]
+            targetwave.fillbetweencolor='#3D5E73'
+            if wavechunk == None:
+                wavechunk = [targetwave]
+            else: 
+                wavechunk.append(targetwave)
+            
             Reference = eegpipe.waveformplotprep()
             Reference.title = 'Reference'
             Reference.x = xtime
             Reference.y = numpy.multiply(outsum,8)
             Reference.linestyle='dashed'
-            Reference.linecolor= '#768591'
+            Reference.linecolor= '#999999'
             Reference.lineweight=0.5
             if wavechunk == None:
                 wavechunk = [Reference]
             else: 
                 wavechunk.append(Reference)
-               
-        
+            
+            # snag egghead
+            #outputamplitude = eegpipe.extractamplitude(EEGdist, Window=[0.300, 0.600], Approach='mean')
+            [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
+            targetegg = eegpipe.eggheadplotprep()
+            targetegg.title = 'Attention'
+            targetegg.channels = outputchannels
+            targetegg.amplitudes = outputamplitude  
+            targetegg.scale = [0, 1]
+            if outputamplitude[outputchannels.index('HOTSPOT')] > targetegg.scale[1]:
+                targetegg.scale[1] = outputamplitude[outputchannels.index('HOTSPOT')]
+            targetegg.opacity = 0.2 
+            if eggchunk == None:
+                eggchunk = [targetegg]
+            else: 
+                eggchunk.append(targetegg) 
+                
+        if eggchunk != None:
+            eggscale = [0, 1]
+            for cA in range(len(eggchunk)):
+                eggscale = eegpipe.determinerescale(eggscale, eggchunk[cA].scale)
+            eggscale = eegpipe.centershift(eggscale)
+            for cA in range(len(eggchunk)):
+                eggchunk[cA].scale = eggscale
         
     eegpipe.reportingwindow(eggs=eggchunk, waveforms=wavechunk, bars=barchunks, fileout = task.outputfile.split('.')[0] + '.png')
-
-    # Backup data
-    #filesync.pushfiles(inpath = '\\Studies\Raw', outpath = 'Z:\Studies\Raw', file_types = ['.psydat', '.tsv', '.tsve', '.csv', '.csve'])
-    

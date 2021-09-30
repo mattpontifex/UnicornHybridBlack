@@ -6,6 +6,8 @@ import Engine.generatesequence as generatesequence
 import Engine.eegpipe as eegpipe
 import numpy
 import scipy
+from tkinter import Tk     # from tkinter import Tk for Python 3.x
+from tkinter.filedialog import askopenfilename
 
 if __name__ == "__main__":
     # Unicorn multiprocessing will not run in Spyder 
@@ -14,9 +16,11 @@ if __name__ == "__main__":
     # Select the checkbox for External system terminal Interact with the Python console after execution
     
     task = Engine()
-    print(task.outputfile)
-    task.outputfile = r'Raw\NBmatt.psydat'
     task.finished = True
+    Tk().withdraw() # we don't want a full GUI, so keep the root window from appearing
+    filename = askopenfilename()  # show an "Open" dialog box and return the path to the selected file
+    task.outputfile = filename.split('.')[0] + '.psydat'
+    #task.outputfile = r'Raw\NBmatt.psydat'
 
     
     
@@ -107,6 +111,7 @@ if __name__ == "__main__":
         #    boolfail = True
         EEG = eegpipe.simplefilter(EEG, Filter = 'Notch', Cutoff = [60.0])
         EEG = eegpipe.simplefilter(EEG, Filter = 'Bandpass', Design = 'Butter', Cutoff = [1.0, 25.0], Order=3)
+        eggscale = [1,0]
         
         # Target stimulus - 30 & 40
         EEGtarg = None
@@ -128,6 +133,7 @@ if __name__ == "__main__":
         if EEGtarg != None:
             [outputamplitude, outputlatency] = eegpipe.extractpeaks(EEGtarg, Window=[0.300, 0.700], Points=9)
             outputamplitude = eegpipe.extractamplitude(EEGtarg, Window=[0.300, 0.700], Approach='mean')
+            eggscale = eegpipe.determinerescale(eggscale, outputamplitude)
             outputchannels = EEGtarg.channels
             # snag waveform
             targetwave = eegpipe.waveformplotprep()
@@ -137,23 +143,13 @@ if __name__ == "__main__":
             targetwave.linestyle='solid'
             targetwave.linecolor= '#A91CD4'
             targetwave.lineweight=2
+            targetwave.fillbetween='ZeroP'
+            targetwave.fillwindow=[0.3,0.6]
             if wavechunk == None:
                 wavechunk = [targetwave]
             else: 
                 wavechunk.append(targetwave)
-            # snag egghead
-            [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
-            targetegg = eegpipe.eggheadplotprep()
-            targetegg.title = 'Attention'
-            targetegg.channels = outputchannels
-            targetegg.amplitudes = outputamplitude  
-            targetegg.scale = [1, 9]
-            targetegg.steps = 256
-            targetegg.opacity = 0.2 
-            if eggchunk == None:
-                eggchunk = [targetegg]
-            else: 
-                eggchunk.append(targetegg) 
+                
             # place in bar
             Attention = eegpipe.barplotprep()
             Attention.title = 'Attention'
@@ -172,6 +168,20 @@ if __name__ == "__main__":
             Processing.biggerisbetter = False
             Processing.unit = ' ms'
             barchunks.append(Processing)
+            
+            # snag egghead
+            [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
+            targetegg = eegpipe.eggheadplotprep()
+            targetegg.title = 'Attention'
+            targetegg.channels = outputchannels
+            targetegg.amplitudes = outputamplitude  
+            targetegg.scale = [1, 9]
+            targetegg.steps = 256
+            targetegg.opacity = 0.2 
+            if eggchunk == None:
+                eggchunk = [targetegg]
+            else: 
+                eggchunk.append(targetegg) 
         
             # creates a stimulus locked model ERP.
             [outsum, outvect, xtime] = eegpipe.createsignal(
@@ -212,32 +222,23 @@ if __name__ == "__main__":
         if EEGresp != None:
             #[outputamplitude, outputlatency] = eegpipe.extractpeaks(EEGresp, Window=[0.300, 0.700], Points=9)
             outputamplitude = eegpipe.extractamplitude(EEGresp, Window=[-0.100, 0.100], Approach='mean')
+            eggscale = eegpipe.determinerescale(eggscale, outputamplitude)
             outputchannels = EEGresp.channels
             # snag waveform
             errorwave = eegpipe.waveformplotprep()
-            errorwave.title = 'Error'
+            errorwave.title = 'Monitoring'
             errorwave.x = EEGresp.times
             errorwave.y = EEGresp.data[outputchannels.index('HOTSPOT')]
             errorwave.linestyle='solid'
             errorwave.linecolor= '#2A60EB'
             errorwave.lineweight=2
+            errorwave.fillbetween='ZeroN'
+            errorwave.fillwindow=[-0.1,0.2]
             if wavechunk == None:
                 wavechunk = [errorwave]
             else: 
                 wavechunk.append(errorwave)
-            # snag egghead
-            [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
-            erroregg = eegpipe.eggheadplotprep()
-            erroregg.title = 'Error'
-            erroregg.channels = outputchannels
-            erroregg.amplitudes = outputamplitude  
-            erroregg.scale = [-9, 1]
-            erroregg.steps = 256
-            erroregg.opacity = 0.2  
-            if eggchunk == None:
-                eggchunk = [erroregg]
-            else: 
-                eggchunk.append(erroregg)
+                
             # place in bar
             Monitoring = eegpipe.barplotprep()
             Monitoring.title = 'Monitoring'
@@ -247,6 +248,25 @@ if __name__ == "__main__":
             Monitoring.biggerisbetter = False
             Monitoring.unit = ' microV'
             barchunks.append(Monitoring)
+            
+            # snag egghead
+            [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
+            erroregg = eegpipe.eggheadplotprep()
+            erroregg.title = 'Monitoring'
+            erroregg.channels = outputchannels
+            erroregg.amplitudes = outputamplitude  
+            erroregg.scale = [-9, 1]
+            erroregg.steps = 256
+            erroregg.opacity = 0.2  
+            if eggchunk == None:
+                eggchunk = [erroregg]
+            else: 
+                eggchunk.append(erroregg)
+            
+        if eggchunk != None:
+            eggscale = eegpipe.centershift(eggscale)
+            for cA in range(len(eggchunk)):
+                eggchunk[cA].scale = eggscale
         
     eegpipe.reportingwindow(eggs=eggchunk, waveforms=wavechunk, bars=barchunks, fileout = task.outputfile.split('.')[0] + '.png')
 

@@ -1821,7 +1821,139 @@ def simpleepoch(EEG, Window=False, Types=False):
 ################################################################################################################################################
 ################################################################################################################################################
 ################################################################################################################################################
+
+def netdeflectiondetection(EEG, Threshold=False, Direction=False, Window=False, Approach=False, Channel=False):
+    # function to reject trials that have net activity beyond the specified level
+    # only updates the EEG.reject status with 4 for netdeflection
+    OUTEEG = copy.deepcopy(EEG)
+    if Threshold == False:
+        Threshold = 0.0
+    Direction = checkdefaultsettings(Direction, ['negative', 'positive'])
+    Approach = checkdefaultsettings(Approach, ['median', 'mean'])
+    if OUTEEG.trials > 0:
+        if Window==False:
+            startindex = 1
+            stopindex = -1
+        else:
+            startindex = closestidx(EEG.times, float(Window[0]))
+            stopindex = closestidx(EEG.times, float(Window[1]))
+        
+        if Channel != False:
+            EEG = collapsechannels(EEG, Channels = Channel, NewChannelName='HOTSPOT', Approach=Approach)
+            cC = EEG.channels.index('HOTSPOT')
+            # loop through each event
+            for cE in range(EEG.trials):
+                if Approach == 'median':
+                    corr1 = numpy.median(EEG.data[cC][cE][startindex:stopindex])
+                else:
+                    corr1 = numpy.mean(EEG.data[cC][cE][startindex:stopindex])
+                
+                if Direction == 'negative':
+                    if corr1 < Threshold:
+                        OUTEEG.reject[cE] = 4
+                else:
+                    if corr1 > Threshold:
+                        OUTEEG.reject[cE] = 4
+            
+        else:
+            for cC in range(EEG.nbchan):
+                # loop through each event
+                for cE in range(EEG.trials):
+                    if Approach == 'median':
+                        corr1 = numpy.median(EEG.data[cC][cE][startindex:stopindex])
+                    else:
+                        corr1 = numpy.mean(EEG.data[cC][cE][startindex:stopindex])
+                    
+                    if Direction == 'negative':
+                        if corr1 < Threshold:
+                            OUTEEG.reject[cE] = 4
+                    else:
+                        if corr1 > Threshold:
+                            OUTEEG.reject[cE] = 4
+        
+
+    return OUTEEG
+
+def antiphasedetection(EEG, Threshold=False, Window=False, Approach=False, Channel=False, Template=[], Mode=False):
+    # function to reject trials that are out of phase with the mean activity within the specified window
+    # only updates the EEG.reject status with 3 for antiphase
+    if Threshold == False:
+        Threshold = 0.1
+    Approach = checkdefaultsettings(Approach, ['median', 'mean'])
+    Mode = checkdefaultsettings(Mode, ['both', 'add', 'remove'])
     
+    OUTEEG = copy.deepcopy(EEG)
+
+    if OUTEEG.trials > 0:
+        # obtain average data for comparison
+        if Channel != False:
+            EEG = collapsechannels(EEG, Channels = Channel, NewChannelName='HOTSPOT', Approach=Approach)
+        EEGcomp = simpleaverage(EEG, Approach = Approach)
+        if Window==False:
+            startindex = 1
+            stopindex = -1
+        else:
+            startindex = closestidx(EEG.times, float(Window[0]))
+            stopindex = closestidx(EEG.times, float(Window[1]))
+        
+        if len(Template) == 0:
+            # loop through each channel
+            if Channel == False:
+                for cC in range(EEG.nbchan):
+                    # loop through each event
+                    for cE in range(EEG.trials):
+                        corr1 = 0
+                        corr1, _ = pearsonr(EEGcomp.data[cC][startindex:stopindex], EEG.data[cC][cE][startindex:stopindex])
+                        if Mode != 'add':
+                            if corr1 < Threshold:
+                                OUTEEG.reject[cE] = 3
+                        if Mode != 'remove':
+                            if corr1 >= Threshold:
+                                OUTEEG.reject[cE] = 0
+            else: 
+                cC = EEG.channels.index('HOTSPOT')
+                # loop through each event
+                for cE in range(EEG.trials):
+                    corr1 = 0
+                    corr1, _ = pearsonr(EEGcomp.data[cC][startindex:stopindex], EEG.data[cC][cE][startindex:stopindex])
+                    if Mode != 'add':
+                        if corr1 < Threshold:
+                            OUTEEG.reject[cE] = 3
+                    if Mode != 'remove':
+                        if corr1 >= Threshold:
+                            OUTEEG.reject[cE] = 0
+                
+        else:
+            # a template was provided for reference
+            # loop through each channel
+            if Channel == False:
+                for cC in range(EEG.nbchan):
+                    # loop through each event
+                    for cE in range(EEG.trials):
+                        corr1 = 0
+                        corr1, _ = pearsonr(Template, EEG.data[cC][cE][startindex:stopindex])
+                        if Mode != 'add':
+                            if corr1 < Threshold:
+                                OUTEEG.reject[cE] = 3
+                        if Mode != 'remove':
+                            if corr1 >= Threshold:
+                                OUTEEG.reject[cE] = 0
+            else: 
+                cC = EEG.channels.index('HOTSPOT')
+                # loop through each event
+                for cE in range(EEG.trials):
+                    corr1 = 0
+                    corr1, _ = pearsonr(Template, EEG.data[cC][cE][startindex:stopindex])
+                    if Mode != 'add':
+                        if corr1 < Threshold:
+                            OUTEEG.reject[cE] = 3
+                    if Mode != 'remove':
+                        if corr1 >= Threshold:
+                            OUTEEG.reject[cE] = 0
+
+
+    return OUTEEG
+
 def voltagethreshold(EEG, Threshold=False, Step=False, NaN=True):
     # function to screen epoched data for voltages or voltage steps that exceed particular thresholds
     # only updates the EEG.reject status with 1 for voltage threshold and 2 for voltage step
@@ -2805,8 +2937,27 @@ def createsignal(Window, Latency, Amplitude, Width, Shape, Smoothing, OverallSmo
 ################################################################################################################################################
 ################################################################################################################################################
     
+def centershift(invect):
+    newmin = min(invect)
+    newmax = max(invect)
+    
+    newmin = numpy.floor(numpy.multiply(newmin, 0.8))
+    newmax = numpy.ceil(numpy.multiply(newmax, 0.8))
+    if (numpy.subtract(newmax, newmin) < float(1.0)):
+        newmin = numpy.subtract(newmin, 0.5)
+        newmax = numpy.add(newmax, 0.5)
+    
+    return [newmin, newmax]
 
-
+def determinerescale(invect, newvect):
+    outvect = copy.deepcopy(invect)
+    for cA in range(len(newvect)):
+        if float(newvect[cA]) < float(outvect[0]):
+            outvect[0] = float(newvect[cA])
+        if float(newvect[cA]) > float(outvect[1]):
+            outvect[1] = float(newvect[cA])
+    
+    return outvect
 
 
 class barplotprep():
@@ -2817,7 +2968,31 @@ class barplotprep():
         self.scale = [0, 100]
         self.biggerisbetter = True
         self.unit = ''
-        self.width = 0.5
+        self.width = 0.5 
+      
+class eggheadplotprep():
+    def __init__(self):
+        self.title = ''
+        self.channels = ['']
+        self.amplitudes = [0]
+        self.scale = [0, 100]
+        self.steps = 256
+        self.opacity = 0.2
+        self.colormap = None
+
+class waveformplotprep():
+    def __init__(self):
+        self.title = ''
+        self.x = [0]
+        self.y = [0]
+        self.linestyle = 'solid'
+        self.linecolor =  None
+        self.lineweight = 2
+        self.fillbetween = None
+        self.fillbetweencolor = 'k'
+        self.fillbetweenopacity = 0.1
+        self.fillwindow = None  
+        
 
 def wavesubplot(waves, scale=None, ax=None, colorscale=None, positivedown=False):
     
@@ -2835,7 +3010,8 @@ def wavesubplot(waves, scale=None, ax=None, colorscale=None, positivedown=False)
                     waves[cA].linecolor = colorscale(cA)
                     
         else:
-            segs = ['#1CD496', '#2A60EB', '#A91CD4', '#F65A3D'] 
+            #segs = ['#1CD496', '#2A60EB', '#A91CD4', '#F65A3D'] 
+            segs = ['#EF6F63', '#EF9A35', '#3D5E73', '#999999', '#004F39']
             for cA in range(len(waves)):
                 if waves[cA].linecolor == None:
                     waves[cA].linecolor = segs[cA]
@@ -2875,8 +3051,7 @@ def wavesubplot(waves, scale=None, ax=None, colorscale=None, positivedown=False)
         ax.plot(waves[cA].x, waves[cA].y, color = waves[cA].linecolor, linestyle = waves[cA].linestyle, linewidth = waves[cA].lineweight, label=waves[cA].title)
 
     for cA in range(len(waves)):
-        if waves[cA].fillbetween != None:
-            
+        if (waves[cA].fillbetween != None) and (waves[cA].fillbetween != 'ZeroP') and (waves[cA].fillbetween != 'ZeroN'):
             targ = 0
             for cAT in range(len(waves)):
                 if waves[cAT].title == waves[cA].fillbetween:
@@ -2889,6 +3064,25 @@ def wavesubplot(waves, scale=None, ax=None, colorscale=None, positivedown=False)
                 winstop = closestidx(waves[cA].x, waves[cA].fillwindow[1])
                 
             ax.fill_between(waves[cA].x[winstart:winstop], waves[cA].y[winstart:winstop], waves[targ].y[winstart:winstop], color=waves[cA].fillbetweencolor, alpha=waves[cA].fillbetweenopacity)
+        
+        if (waves[cA].fillbetween == 'ZeroP') or (waves[cA].fillbetween == 'ZeroN'):
+            ref = [0] * len(waves[cA].x)
+            for cI in range(0, len(ref)):
+                if (waves[cA].fillbetween == 'ZeroP') and (float(waves[cA].y[cI]) <= float(0)):
+                    ref[cI] = float(waves[cA].y[cI])
+                if (waves[cA].fillbetween == 'ZeroN') and (float(waves[cA].y[cI]) >= float(0)):
+                    ref[cI] = float(waves[cA].y[cI])
+                    
+            winstart = 0
+            winstop = -1
+            if waves[cA].fillwindow != None:
+                winstart = closestidx(waves[cA].x, waves[cA].fillwindow[0])
+                winstop = closestidx(waves[cA].x, waves[cA].fillwindow[1])
+            
+            ax.fill_between(waves[cA].x[winstart:winstop], waves[cA].y[winstart:winstop], ref[winstart:winstop], color=waves[cA].fillbetweencolor, alpha=waves[cA].fillbetweenopacity)
+        
+        
+        
         
     if scale != None:
         matplotlib.pyplot.ylim(scale)
@@ -2924,7 +3118,8 @@ def barsubplot(values, scale, ax=None, width=None, colorscale=None, units=None, 
     if colorscale == None:
         #colorscale = crushparula(100)
         #colorscale = colorscale.reversed()
-        segs = ['#4CC700', '#53E6E3', '#DDDEF4', '#E273F5', '#D13608'] 
+        #segs = ['#4CC700', '#53E6E3', '#DDDEF4', '#E273F5', '#D13608'] 
+        segs = ['#004F39', '#3D5E73', '#999999', '#EF9A35', '#EF6F63'] 
         colorscale = LinearSegmentedColormap.from_list("", segs, 100) 
         colorscale = colorscale.reversed()
         
@@ -3010,28 +3205,6 @@ def barsubplot(values, scale, ax=None, width=None, colorscale=None, units=None, 
         
 
 
-class eggheadplotprep():
-    def __init__(self):
-        self.title = ''
-        self.channels = ['']
-        self.amplitudes = [0]
-        self.scale = [0, 100]
-        self.steps = 256
-        self.opacity = 0.2
-        self.colormap = None
-
-class waveformplotprep():
-    def __init__(self):
-        self.title = ''
-        self.x = [0]
-        self.y = [0]
-        self.linestyle = 'solid'
-        self.linecolor =  None
-        self.lineweight = 2
-        self.fillbetween = None
-        self.fillbetweencolor = 'k'
-        self.fillbetweenopacity = 0.1
-        self.fillwindow = None
 
 def reportingwindow(eggs=None, waveforms=None, bars=None, alternatelabelsat=2, colormap=None, tickvalues=None, waveformscale=None, waveformpositivedown=True, fileout=None):
     
@@ -3060,11 +3233,10 @@ def reportingwindow(eggs=None, waveforms=None, bars=None, alternatelabelsat=2, c
         # Egg head plots
         if eggs != None:
             if colormap == None:
-                colormap = matplotlib.pyplot.cm.viridis
+                #colormap = matplotlib.pyplot.cm.viridis
+                colormap = crushparula(256)
             if tickvalues == None:
                 tickvalues = matplotlib.ticker.AutoLocator()
-            
-            norm = matplotlib.colors.Normalize(vmin=eggs[0].scale[0], vmax=eggs[0].scale[1])
         
             # determine arrangement
             nrow = 1;
@@ -3075,16 +3247,25 @@ def reportingwindow(eggs=None, waveforms=None, bars=None, alternatelabelsat=2, c
                 nrow = int(numpy.ceil(numpy.divide(len(eggs),4)))
                 ncol = 4
             
+            axfontsize=16
+            cmsizey=0.015
+            cmsizex=0.12
+            if ncol > 2:
+                axfontsize = axfontsize-3
+                cmsizey=0.01
+                cmsizex=0.10
+            
             axhead = ax[0, 0].subgridspec(nrow, ncol, wspace=0.4, hspace=0.05)            
             for cA in range(len(eggs)):
-                axheadsub = fig.add_subplot(axhead[0, cA])   
-                eggheadplot_sub(eggs[cA].channels, eggs[cA].amplitudes, axheadsub, Steps=eggs[cA].steps, Scale=eggs[cA].scale, Colormap=colormap, BrainOpacity=eggs[cA].opacity)
-                axheadsub.set_title(eggs[cA].title + '\n', color='black', fontweight='bold', fontsize=16, ha='center', va='center')
+                axheadsub = fig.add_subplot(axhead[0, cA])  
                 
-            pos1 = axheadsub.get_position()
-            cbar_ax = fig.add_axes([0.225, pos1.y0-0.05, 0.15, 0.02])
-            fig.colorbar(matplotlib.cm.ScalarMappable(cmap=colormap, norm=norm), cax=cbar_ax, orientation='horizontal', ticks=tickvalues)
-        
+                eggheadplot_sub(eggs[cA].channels, eggs[cA].amplitudes, axheadsub, Steps=eggs[cA].steps, Scale=eggs[cA].scale, Colormap=colormap, BrainOpacity=eggs[cA].opacity)
+                axheadsub.set_title(eggs[cA].title + '\n', color='black', fontweight='bold', fontsize=axfontsize, ha='center', va='center')
+                    
+                pos1 = axheadsub.get_position()
+                norm = matplotlib.colors.Normalize(vmin=eggs[cA].scale[0], vmax=eggs[cA].scale[1])
+                fig.colorbar(matplotlib.cm.ScalarMappable(cmap=colormap, norm=norm), cax=fig.add_axes([pos1.x0+0.015, pos1.y0-0.05, cmsizex, cmsizey]), orientation='horizontal', ticks=matplotlib.ticker.AutoLocator())
+            
         # Waveforms
         if waveforms != None:
             axwave = fig.add_subplot(ax[0, 1])
