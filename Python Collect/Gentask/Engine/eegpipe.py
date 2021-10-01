@@ -1268,12 +1268,16 @@ def extractamplitude(EEG, Window=False, Approach=False):
                 
     return outputvalues
 
-def extractpeaks(EEG, Window=False, Points=False, Direction=False):
+def extractpeaks(EEG, Window=False, Points=False, Direction=False, Surround=False):
     Direction = checkdefaultsettings(Direction, ['max', 'min'])
     
     if Points == False:
         Points = 9
-    Points = int(Points)    
+    Points = int(Points)
+    
+    if Surround == False:
+        Surround = 0
+    Surround = int(Surround)
     
     if Window != False:
         startindex = int(closestidx(EEG.times, float(Window[0])))
@@ -1298,11 +1302,24 @@ def extractpeaks(EEG, Window=False, Points=False, Direction=False):
                         searchdata = numpy.multiply(searchdata, -1)
                             
                     outpoint = peakutils.indexes(searchdata, thres=float(maxthresh), min_dist=int(Points))
-                    maxthresh = numpy.subtract(maxthresh, 0.01)
-                    if (maxthresh < 0.5):
-                        outpoint = [0]              
+                    if len(outpoint) == 0:
+                        maxthresh = numpy.subtract(maxthresh, 0.01)
+                        if (maxthresh < 0.5):
+                            outpoint = [0]              
                 
-                currentepochamplitude.append(EEG.data[cC][cE][startindex + outpoint[0]])
+                trialamp = numpy.nan
+                if Surround == 0:
+                    trialamp = EEG.data[cC][cE][startindex + outpoint[0]]
+                else:
+                    winbeg = numpy.subtract(numpy.add(float(startindex), float(outpoint[0])), float(Surround))
+                    if winbeg < float(0.0):
+                        winbeg == 0
+                    winend = numpy.add(numpy.add(float(startindex), float(outpoint[0])), float(Surround))
+                    if winend > len(EEG.times):
+                        winend == len(EEG.times)
+                    trialamp = numpy.mean(EEG.data[cC][cE][int(winbeg):int(winend)])
+
+                currentepochamplitude.append(trialamp)
                 currentepochlatency.append(EEG.times[startindex + outpoint[0]])
                 
             outputamplitude.append(currentepochamplitude)
@@ -1318,11 +1335,24 @@ def extractpeaks(EEG, Window=False, Points=False, Direction=False):
                     searchdata = numpy.multiply(searchdata, -1)
 
                 outpoint = peakutils.indexes(searchdata, thres=float(maxthresh), min_dist=int(Points))
-                maxthresh = numpy.subtract(maxthresh, 0.01)
-                if (maxthresh < 0.5):
-                    outpoint = [0]
+                if len(outpoint) == 0:
+                    maxthresh = numpy.subtract(maxthresh, 0.01)
+                    if (maxthresh < 0.5):
+                        outpoint = [0]
             
-            outputamplitude.append(EEG.data[cC][startindex + outpoint[0]])
+            trialamp = numpy.nan
+            if Surround == 0:
+                trialamp = EEG.data[cC][startindex + outpoint[0]]
+            else:
+                winbeg = numpy.subtract(numpy.add(float(startindex), float(outpoint[0])), float(Surround))
+                if winbeg < float(0.0):
+                    winbeg == 0
+                winend = numpy.add(numpy.add(float(startindex), float(outpoint[0])), float(Surround))
+                if winend > len(EEG.times):
+                    winend == len(EEG.times)
+                trialamp = numpy.mean(EEG.data[cC][int(winbeg):int(winend)])
+                
+            outputamplitude.append(trialamp)
             outputlatency.append(EEG.times[startindex + outpoint[0]])
             
     return [outputamplitude, outputlatency]

@@ -195,6 +195,7 @@ class Engine():
             # Setup Display Window
             self.participantwin = visual.Window(size = self.participantmonitor.resolution, fullscr = self.participantmonitor.fullscreen, screen = self.participantmonitor.displaynumber, allowGUI = self.participantmonitor.gui, allowStencil = self.participantmonitor.stencil, monitor = self.participantmonitor.monitor, color = self.participantmonitor.backgroundcolor, colorSpace = self.participantmonitor.colorspace)
             self.participantwinActive = True
+            self.participantwin.winHandle.activate() 
             if self.expdisp:
                 self.experimenterwin = visual.Window(size = self.experimentermonitor.resolution, fullscr = self.experimentermonitor.fullscreen, screen = self.experimentermonitor.displaynumber, allowGUI = self.experimentermonitor.gui, allowStencil = self.experimentermonitor.stencil, monitor = self.experimentermonitor.monitor, color = self.experimentermonitor.backgroundcolor, colorSpace = self.experimentermonitor.colorspace)
                             
@@ -255,7 +256,8 @@ class Engine():
         
         
         
-        
+            self.participantwin.winHandle.maximize() 
+            self.participantwin.winHandle.activate() 
         
         
             #####  Test Monitor #####  
@@ -408,7 +410,7 @@ class Engine():
                 except:
                     print('ERROR: An error occurred while loading the sequence information or preloading the stimuli.')
                     self.quit = True
-
+                    
                 # Establish tracking
                 # Establish spec array to track what the engine actually did
                 self.specarray = []
@@ -499,7 +501,7 @@ class Engine():
                 #self.participantwin.flip(); self.sendtrigger(0) # Send trigger
                 
                 time.sleep(self.delaybeforestart)
-                
+
                 #####  Task Begins #####  
                 
                 # Progress through sequence of trials
@@ -592,8 +594,6 @@ class Engine():
                             self.elapsedTime = core.Clock(); self.elapsedTime.reset()    
                             event.clearEvents()
                             
-                            
-                            
                             if self.debug:
                                 checktimes = []
                                 
@@ -607,8 +607,8 @@ class Engine():
                                     print('Stimulus duration: %f' % float(self.sequencelist[self.trial][self.seqNstimulusDuration]))
                                     print('Response window: %f' % float(self.sequencelist[self.trial][self.seqNresponseWindow_max]))
                                     print('Participant keys: ', self.participantkeys)
-                                    
-                                
+
+
                                 while self.continuetrial:
                                     turnstimoff = False
                     
@@ -636,8 +636,9 @@ class Engine():
                                         else: # Stimulus is being shown
                                             if ((self.elapsedTime.getTime() - self.stimOnTime) >= (float(self.sequencelist[self.trial][self.seqNstimulusDuration]))): # If stimulus duration expired
                                                 turnstimoff = True
-                                            
+                                                
                                         #if self.debug:
+                                            #print(self.participantwin._toDraw)
                                             #timecheck = self.elapsedTime.getTime()
                                             #print('%f' % timecheck)
                                             #checktimes.append(timecheck)
@@ -1188,7 +1189,8 @@ class Engine():
                 
                 
                 # End of Task
-                self.finished = True
+                if not self.quit:
+                    self.finished = True
                 if self.debug:
                     print('Stimulus Events')
                     for incX in range(0,len(self.specarray)):
@@ -1707,9 +1709,9 @@ class Engine():
         
         # Preloads images
         if self.individualimagelist: # if there are images in the list
-            self.taskstimuliparticipant = [visual.ImageStim(self.participantwin,image=os.path.join(self.folders.stimulusfolder, img), pos = [0.0,0.0], interpolate=True, autoLog=False) for img in self.individualimagelist]  # preloads the unique images
+            self.taskstimuliparticipant = [visual.ImageStim(self.participantwin,image=os.path.join(self.folders.stimulusfolder, img), pos = [0.0,0.0], interpolate=False, opacity=1.0, contrast=1.0, autoLog=False) for img in self.individualimagelist]  # preloads the unique images
             if self.expdisp:
-                self.taskstimuliexperimenter = [visual.ImageStim(self.experimenterwin,image=os.path.join(self.folders.stimulusfolder, img), pos = [0.0,0.0], interpolate=True, autoLog=False) for img in self.individualimagelist]  # preloads the unique images
+                self.taskstimuliexperimenter = [visual.ImageStim(self.experimenterwin,image=os.path.join(self.folders.stimulusfolder, img), pos = [0.0,0.0], interpolate=False, autoLog=False) for img in self.individualimagelist]  # preloads the unique images
             for n in range(1,self.sequencelistL):
                 if self.sequencelist[n][self.seqNstimulustype] == '0': # if the stimulus type is an image
                     self.sequencelist[n][self.seqNstimulusFile] = self.individualimagelist.index(self.sequencelist[n][self.seqNstimulusFile]) # replaces the file name with the unique image identifier
