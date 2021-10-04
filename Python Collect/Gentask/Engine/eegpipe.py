@@ -1861,6 +1861,8 @@ def netdeflectiondetection(EEG, Threshold=False, Direction=False, Window=False, 
     Direction = checkdefaultsettings(Direction, ['negative', 'positive'])
     Approach = checkdefaultsettings(Approach, ['median', 'mean'])
     if OUTEEG.trials > 0:
+        cortab = [0] * OUTEEG.trials
+        
         if Window==False:
             startindex = 1
             stopindex = -1
@@ -1877,31 +1879,44 @@ def netdeflectiondetection(EEG, Threshold=False, Direction=False, Window=False, 
                     corr1 = numpy.median(EEG.data[cC][cE][startindex:stopindex])
                 else:
                     corr1 = numpy.mean(EEG.data[cC][cE][startindex:stopindex])
+                cortab[cE] = corr1
                 
-                if Direction == 'negative':
-                    if corr1 < Threshold:
-                        OUTEEG.reject[cE] = 4
-                else:
-                    if corr1 > Threshold:
-                        OUTEEG.reject[cE] = 4
             
         else:
-            for cC in range(EEG.nbchan):
-                # loop through each event
-                for cE in range(EEG.trials):
+            # loop through each event
+            for cE in range(EEG.trials):
+                chancortab = [numpy.nan] * EEG.nbchan
+                for cC in range(EEG.nbchan):    
                     if Approach == 'median':
                         corr1 = numpy.median(EEG.data[cC][cE][startindex:stopindex])
                     else:
                         corr1 = numpy.mean(EEG.data[cC][cE][startindex:stopindex])
+                    chancortab[cC] = corr1
+                cortab[cE] = numpy.median(chancortab)
                     
-                    if Direction == 'negative':
-                        if corr1 < Threshold:
-                            OUTEEG.reject[cE] = 4
-                    else:
-                        if corr1 > Threshold:
-                            OUTEEG.reject[cE] = 4
+        acceptedtrials = 0
+        cdiff = 0
+        while ((acceptedtrials < 5) and (cdiff < 400)) :
+            OUTEEGtemp = copy.deepcopy(OUTEEG)
+               
+            for cE in range(OUTEEGtemp.trials): 
+                if Direction == 'negative':
+                    if corr1 < Threshold:
+                        OUTEEGtemp.reject[cE] = 4
+                else:
+                    if corr1 > Threshold:
+                        OUTEEGtemp.reject[cE] = 4
+            
+            if Direction == 'negative':
+                Threshold = numpy.subtract(Threshold, 0.001)
+            else:
+                Threshold = numpy.add(Threshold, 0.001)
+            cdiff = cdiff + 1
+            acceptedtrials = len([v for i,v in enumerate(OUTEEGtemp.reject) if v == 0])
         
-
+        OUTEEG = copy.deepcopy(OUTEEGtemp)
+                    
+    OUTEEG.acceptedtrials = len([v for i,v in enumerate(OUTEEG.reject) if v == 0])             
     return OUTEEG
 
 def antiphasedetection(EEG, Threshold=False, Window=False, Approach=False, Channel=False, Template=[], Mode=False):
@@ -1915,6 +1930,8 @@ def antiphasedetection(EEG, Threshold=False, Window=False, Approach=False, Chann
     OUTEEG = copy.deepcopy(EEG)
 
     if OUTEEG.trials > 0:
+        cortab = [0] * OUTEEG.trials
+        
         # obtain average data for comparison
         if Channel != False:
             EEG = collapsechannels(EEG, Channels = Channel, NewChannelName='HOTSPOT', Approach=Approach)
@@ -1927,61 +1944,67 @@ def antiphasedetection(EEG, Threshold=False, Window=False, Approach=False, Chann
             stopindex = closestidx(EEG.times, float(Window[1]))
         
         if len(Template) == 0:
-            # loop through each channel
+            
             if Channel == False:
-                for cC in range(EEG.nbchan):
-                    # loop through each event
-                    for cE in range(EEG.trials):
+                # loop through each event
+                for cE in range(EEG.trials):
+                    chancortab = [numpy.nan] * EEG.nbchan
+                    # loop through each channel
+                    for cC in range(EEG.nbchan):
                         corr1 = 0
                         corr1, _ = pearsonr(EEGcomp.data[cC][startindex:stopindex], EEG.data[cC][cE][startindex:stopindex])
-                        if Mode != 'add':
-                            if corr1 < Threshold:
-                                OUTEEG.reject[cE] = 3
-                        if Mode != 'remove':
-                            if corr1 >= Threshold:
-                                OUTEEG.reject[cE] = 0
+                        chancortab[cC] = corr1
+                    cortab[cE] = numpy.median(chancortab)
+                    
             else: 
                 cC = EEG.channels.index('HOTSPOT')
                 # loop through each event
                 for cE in range(EEG.trials):
                     corr1 = 0
                     corr1, _ = pearsonr(EEGcomp.data[cC][startindex:stopindex], EEG.data[cC][cE][startindex:stopindex])
-                    if Mode != 'add':
-                        if corr1 < Threshold:
-                            OUTEEG.reject[cE] = 3
-                    if Mode != 'remove':
-                        if corr1 >= Threshold:
-                            OUTEEG.reject[cE] = 0
-                
+                    cortab[cE] = corr1
+                    
         else:
             # a template was provided for reference
-            # loop through each channel
             if Channel == False:
-                for cC in range(EEG.nbchan):
-                    # loop through each event
-                    for cE in range(EEG.trials):
+                # loop through each event
+                for cE in range(EEG.trials):
+                    chancortab = [numpy.nan] * EEG.nbchan
+                    # loop through each channel
+                    for cC in range(EEG.nbchan):
                         corr1 = 0
                         corr1, _ = pearsonr(Template, EEG.data[cC][cE][startindex:stopindex])
-                        if Mode != 'add':
-                            if corr1 < Threshold:
-                                OUTEEG.reject[cE] = 3
-                        if Mode != 'remove':
-                            if corr1 >= Threshold:
-                                OUTEEG.reject[cE] = 0
+                        chancortab[cC] = corr1
+                    cortab[cE] = numpy.median(chancortab)
+
             else: 
                 cC = EEG.channels.index('HOTSPOT')
                 # loop through each event
                 for cE in range(EEG.trials):
                     corr1 = 0
                     corr1, _ = pearsonr(Template, EEG.data[cC][cE][startindex:stopindex])
-                    if Mode != 'add':
-                        if corr1 < Threshold:
-                            OUTEEG.reject[cE] = 3
-                    if Mode != 'remove':
-                        if corr1 >= Threshold:
-                            OUTEEG.reject[cE] = 0
-
-
+                    cortab[cE] = corr1
+                    
+        acceptedtrials = 0
+        cdiff = 0
+        while ((acceptedtrials < 5) and (cdiff < 400)) :
+            OUTEEGtemp = copy.deepcopy(OUTEEG)
+               
+            for cE in range(OUTEEGtemp.trials): 
+                if Mode != 'add':
+                    if cortab[cE] < Threshold:
+                        OUTEEGtemp.reject[cE] = 3
+                if Mode != 'remove':
+                    if cortab[cE] >= Threshold:
+                        OUTEEGtemp.reject[cE] = 0
+            
+            Threshold = numpy.subtract(Threshold, 0.001)
+            cdiff = cdiff + 1
+            acceptedtrials = len([v for i,v in enumerate(OUTEEGtemp.reject) if v == 0])
+        
+        OUTEEG = copy.deepcopy(OUTEEGtemp)
+                    
+    OUTEEG.acceptedtrials = len([v for i,v in enumerate(OUTEEG.reject) if v == 0])
     return OUTEEG
 
 def voltagethreshold(EEG, Threshold=False, Step=False, NaN=True):
@@ -3262,9 +3285,7 @@ def reportingwindow(eggs=None, waveforms=None, bars=None, alternatelabelsat=2, c
         
         # Egg head plots
         if eggs != None:
-            if colormap == None:
-                #colormap = matplotlib.pyplot.cm.viridis
-                colormap = crushparula(256)
+            
             if tickvalues == None:
                 tickvalues = matplotlib.ticker.AutoLocator()
         
@@ -3287,14 +3308,18 @@ def reportingwindow(eggs=None, waveforms=None, bars=None, alternatelabelsat=2, c
             
             axhead = ax[0, 0].subgridspec(nrow, ncol, wspace=0.4, hspace=0.05)            
             for cA in range(len(eggs)):
+                if eggs[cA].colormap == None:
+                    #eggs[cA].colormap = matplotlib.pyplot.cm.viridis
+                    eggs[cA].colormap = crushparula(256)
+                
                 axheadsub = fig.add_subplot(axhead[0, cA])  
                 
-                eggheadplot_sub(eggs[cA].channels, eggs[cA].amplitudes, axheadsub, Steps=eggs[cA].steps, Scale=eggs[cA].scale, Colormap=colormap, BrainOpacity=eggs[cA].opacity)
+                eggheadplot_sub(eggs[cA].channels, eggs[cA].amplitudes, axheadsub, Steps=eggs[cA].steps, Scale=eggs[cA].scale, Colormap=eggs[cA].colormap, BrainOpacity=eggs[cA].opacity)
                 axheadsub.set_title(eggs[cA].title + '\n', color='black', fontweight='bold', fontsize=axfontsize, ha='center', va='center')
                     
                 pos1 = axheadsub.get_position()
                 norm = matplotlib.colors.Normalize(vmin=eggs[cA].scale[0], vmax=eggs[cA].scale[1])
-                fig.colorbar(matplotlib.cm.ScalarMappable(cmap=colormap, norm=norm), cax=fig.add_axes([pos1.x0+0.015, pos1.y0-0.05, cmsizex, cmsizey]), orientation='horizontal', ticks=matplotlib.ticker.AutoLocator())
+                fig.colorbar(matplotlib.cm.ScalarMappable(cmap=eggs[cA].colormap, norm=norm), cax=fig.add_axes([pos1.x0+0.015, pos1.y0-0.05, cmsizex, cmsizey]), orientation='horizontal', ticks=matplotlib.ticker.AutoLocator())
             
         # Waveforms
         if waveforms != None:

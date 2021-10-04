@@ -40,7 +40,8 @@ class Viewer():
         self.rollingspan = 13.5
         self.trimspanlead = 0.5
         self.trimspantrail = 2.0
-        self.channellabels = ['FZ', 'C3', 'CZ', 'C4', 'PZ', 'O1', 'OZ', 'O2']
+        self.unicornchannels = 'FZ, FC1, FC2, C3, CZ, C4, CPZ, PZ, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
+        self.channellabels = self.unicornchannels.split(',')[0:int(self.numberOfAcquiredChannels)]
         self.updatetime = 200 # update every x ms
         self.updatetimelog = []
 
@@ -98,6 +99,7 @@ class Viewer():
         
         
     def prep(self):
+        self.channellabels = self.unicornchannels.split(',')[0:int(self.numberOfAcquiredChannels)]
         
         self.trimspan = self.trimspanlead + self.trimspantrail
         
@@ -447,6 +449,6 @@ class Viewer():
 
 if __name__ == '__main__':
     task = Viewer()
-    task.channellabels = ['FCZ', 'CP1', 'CPZ', 'CP2', 'P1', 'PZ', 'P2', 'OZ']
+    task.unicornchannels = 'FZ, FC1, FC2, C3, CZ, C4, CPZ, PZ, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
     task.unicorn = 'UN-2019.05.51' 
     task.run()

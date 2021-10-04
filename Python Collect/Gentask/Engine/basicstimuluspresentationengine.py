@@ -95,8 +95,8 @@ class Engine():
         self.instructioncard = ['Instructions.png']
         self.showinstructions = True
         self.delaybeforestart = 5
-        self.pauseatstart = True
-        self.pauseatend = True
+        self.pauseatstart = False
+        self.pauseatend = False
         self.waitcard = []
         self.sequence = []
         self.permanentframemask = []
