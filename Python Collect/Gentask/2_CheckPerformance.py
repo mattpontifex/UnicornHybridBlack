@@ -15,4 +15,4 @@ if __name__ == "__main__":
     root.destroy()
     task.outputfile = filename.split('.')[0] + '.psydat'
     
-    performancereporter(task, show=False)
+    performancereporter(task)
