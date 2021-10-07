@@ -7,34 +7,201 @@ from tkinter import Tk     # from tkinter import Tk for Python 3.x
 from tkinter.filedialog import askopenfilename
 import matplotlib.pyplot
 
+import tkinter 
+import tkinter.ttk 
+from PIL import ImageTk 
+import time
+from threading import Thread
+from multiprocessing import Queue
 
-def performancereporter(task, show=True):
-    filin = task.outputfile.split('.')[0]
-    filin = os.path.split(filin)[1]
-    
+def performancereporter(task):
     eggchunk = None
     wavechunk = None
     barchunks = None
     
-    if filin[0:2] == 'OB':
-        # oddball task
-        [eggchunk, wavechunk, barchunks] = checkoddballperf(task, show)
+    # initialize the proccessing wait screen
+    waitscr = waitscreen()
+    # send task to processor
+    waitscr.task = task
+    # start the processor
+    waitscr.show()
         
-    elif filin[0:2] == 'FT':
-        # flanker task
-        [eggchunk, wavechunk, barchunks] = checkflankerperf(task, show)
-        
-    elif filin[0:3] == 'N2B':
-        # flanker task
-        [eggchunk, wavechunk, barchunks] = checkn2backperf(task, show)
-        
-    elif filin[0:3] == 'CN2B':
-        # flanker task
-        [eggchunk, wavechunk, barchunks] = checkcontinousn2backperf(task, show)
-        
-        
+    root = Tk()
+    root.withdraw()
+    root.destroy()
+    # pull the processor result    
+    [eggchunk, wavechunk, barchunks] = waitscr.result
     if not ((eggchunk == None) and (wavechunk == None) and (barchunks == None)):
         eegpipe.reportingwindow(eggs=eggchunk, waveforms=wavechunk, bars=barchunks, fileout = task.outputfile.split('.')[0] + '.png')
+
+
+
+class alternatethread():
+    
+    def __init__(self):
+        self._close = False
+        self.result = 0
+    
+    def run(self, queue, task):
+        showoutput = False
+        eggchunk = None
+        wavechunk = None
+        barchunks = None
+        
+        filin = task.outputfile.split('.')[0]
+        filin = os.path.split(filin)[1]
+        if filin[0:2] == 'OB':
+            # oddball task
+            [eggchunk, wavechunk, barchunks] = checkoddballperf(task, showoutput)
+            
+        elif filin[0:2] == 'FT':
+            # flanker task
+            [eggchunk, wavechunk, barchunks] = checkflankerperf(task, showoutput)
+            
+        elif filin[0:3] == 'N2B':
+            # flanker task
+            [eggchunk, wavechunk, barchunks] = checkn2backperf(task, showoutput)
+            
+        elif filin[0:3] == 'CN2B':
+            # flanker task
+            [eggchunk, wavechunk, barchunks] = checkcontinousn2backperf(task, showoutput)
+        
+        queue.put([eggchunk, wavechunk, barchunks])
+        queue.put(None)
+    
+class waitscreen():
+    
+    def __init__(self):
+        self._close = False
+        self._queue = Queue()
+        self.task = None
+        self.result = None
+    
+    def show(self):
+        # creating tkinter window
+        self.window = tkinter.Tk()
+        self.window.lift()
+        self.window.wm_attributes('-topmost',1)
+        self.window.title("")
+        self.winsize = [400, 300]
+    
+        # intialize alternative thread
+        try:
+            # initialize alternative thread
+            self.altthread = alternatethread()
+            self._altthread = Thread(target=self.altthread.run, args=[self._queue, self.task], daemon=True)
+            self._altthread.name = 'altthread'
+            self._altthread.start()
+        except:
+            print("Error initializing.")
+    
+        #TK approach is to create then place
+        header = tkinter.Frame(master=self.window, width=self.winsize[0], height=numpy.multiply(self.winsize[1],0.1), bg="white")
+        header2 = tkinter.Frame(master=self.window, width=self.winsize[0], height=numpy.multiply(self.winsize[1],0.1), bg="white")
+        body = tkinter.Frame(master=self.window, width=self.winsize[0], height=numpy.multiply(self.winsize[1],0.7), bg="white")
+        
+        header2text = tkinter.Label(master=header2, text='processing...', fg='gray', font=(None, 25),
+                                 justify='center', anchor='center', 
+                                 width=int(numpy.multiply(self.winsize[0],0.09)))
+        
+        footer = tkinter.Frame(master=self.window, width=self.winsize[0], height=numpy.multiply(self.winsize[1],0.1), bg="white")
+       
+        frame = tkinter.Frame(self.window)
+        self.canvas = tkinter.Canvas(frame, bg="white", width=self.winsize[0], height=numpy.multiply(self.winsize[1],0.7))
+        photoimage = []
+        try:
+            photoimage = ImageTk.PhotoImage(file="eggheadframe1.png")
+        except:
+            try:
+                photoimage = ImageTk.PhotoImage(file="Engine" + os.path.sep + "eggheadframe1.png")
+            except:
+                photoimage = ImageTk.PhotoImage(file="Gentask" + os.path.sep + "Engine" + os.path.sep + "eggheadframe1.png")
+        try:
+            self.canvas.create_image(self.winsize[0]/2 + self.winsize[0]/5, numpy.multiply(self.winsize[1],0.7)/2, image=photoimage, anchor="center")
+        except:
+            pass
+        self.window.columnconfigure(0, weight=1, minsize=self.winsize[0])
+        header.grid(row=0, column=0, sticky="nsew")
+        header2text.grid(row=1, column=0, sticky="nsew")
+        header2.grid(row=1, column=0, sticky="nsew")
+        
+        frame.grid(row=2, column=0, sticky="nsew")
+        self.canvas.grid(row=2, column=0, sticky="nsew")
+        body.grid(row=2, column=0, sticky="nsew")
+        
+        footer.grid(row=3, column=0, sticky="nsew")
+        
+        self.window.rowconfigure(0, weight=1, minsize=numpy.multiply(self.winsize[1],0.1))
+        self.window.rowconfigure(1, weight=1, minsize=numpy.multiply(self.winsize[1],0.2))
+        self.window.rowconfigure(2, weight=1, minsize=numpy.multiply(self.winsize[1],0.7))
+        self.window.rowconfigure(3, weight=1, minsize=numpy.multiply(self.winsize[1],0.1))
+        
+        [x, y] = centerprompt(self.window)
+        
+        self.window.geometry("+%d+%d" % (x, y))
+        self._job = self.window.after(10, self._amidead)
+        self.animate_scan()
+        self.window.mainloop()
+        
+    def close(self):
+        self._close = True
+        self.window.after_cancel(self._job)
+        self._altthread.join()
+        self.result = self._queue.get()
+        
+    def _amidead(self):
+        try:
+            self._job = self.window.after(10, self._amidead)
+            if not self._altthread.isAlive():
+                self.close()
+            if self._close:
+                try:
+                    self.window.after_cancel(self._job)
+                    self.window.destroy()
+                    self._altthread.join()
+                except:
+                    pass
+        except:
+            pass
+  
+    def animate_scan(self):
+        self.x0 = self.winsize[0]/2
+        self.y0 = numpy.multiply(self.winsize[1],0.7)/2
+        self.scan = self.canvas.create_rectangle(self.x0-10, self.y0, self.x0+165, self.y0+8, outline="#00ff11", fill="#00ff11", stipple="gray25")
+        yinc = 1.5
+        #xinc = 5
+        
+        while not self._close:
+            self.canvas.move(self.scan,0,yinc)
+            self.window.update()
+            time.sleep(0.01)
+            
+            if not self._close:
+                scan_pos = self.canvas.coords(self.scan)
+                xl,yl,xr,yr = scan_pos
+                #if xl < abs(xinc) or xr > animation_window_width-abs(xinc):
+                #  xinc = -xinc
+                if yl < abs(yinc)+(abs(yinc)*15) or yr > numpy.multiply(self.winsize[1],0.7)-(abs(yinc)*15):
+                  yinc = -yinc
+
+
+
+
+def centerprompt(toplevel):
+    toplevel.update_idletasks()
+
+    # Tkinter way to find the screen resolution
+    screen_width = toplevel.winfo_screenwidth()
+    screen_height = toplevel.winfo_screenheight()
+
+    size = tuple(int(_) for _ in toplevel.geometry().split('+')[0].split('x'))
+    x = screen_width/2 - size[0]/2
+    y = screen_height/2 - size[1]/2
+    
+    toplevel.geometry("+%d+%d" % (x, y))
+    
+    return [x, y]
+
 
 
 def checkoddballperf(task, show=True):   
