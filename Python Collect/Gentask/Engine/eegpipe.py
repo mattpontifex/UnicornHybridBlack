@@ -327,18 +327,27 @@ def eggheadplot_sub(Channels, Amplitude, ax=None, Steps=512, Scale=False, Colorm
         try:
             framemask = matplotlib.image.imread('eggheadplot1.png')
         except:
-            framemask = matplotlib.image.imread('Gentask\Engine\eggheadplot1.png')
+            try:
+                framemask = matplotlib.image.imread('Engine' + os.path.sep + 'eggheadplot1.png')
+            except:
+                framemask = matplotlib.image.imread('Gentask' + os.path.sep + 'Engine' + os.path.sep + 'eggheadplot1.png')
             
     elif Style.upper() == ('Outline').upper():
         try:
             framemask = matplotlib.image.imread('eggheadplot2.png')
         except:
-            framemask = matplotlib.image.imread('Gentask\Engine\eggheadplot2.png')
+            try:
+                framemask = matplotlib.image.imread('Engine' + os.path.sep + 'eggheadplot2.png')
+            except:
+                framemask = matplotlib.image.imread('Gentask' + os.path.sep + 'Engine' + os.path.sep + 'eggheadplot2.png')
     else:
         try:
             framemask = matplotlib.image.imread('eggheadplot3.png')
         except:
-            framemask = matplotlib.image.imread('Gentask\Engine\eggheadplot3.png')
+            try:
+                framemask = matplotlib.image.imread('Engine' + os.path.sep + 'eggheadplot3.png')
+            except:
+                framemask = matplotlib.image.imread('Gentask' + os.path.sep + 'Engine' + os.path.sep + 'eggheadplot3.png')
     
     imgmask = framemask[:,:,0] == framemask[:,:,1];
     framemask[imgmask == 0, 3] = 0      # 100% transparent
@@ -347,7 +356,10 @@ def eggheadplot_sub(Channels, Amplitude, ax=None, Steps=512, Scale=False, Colorm
         try:
             eggbrain = matplotlib.image.imread('eggheadplot4.png')
         except:
-            eggbrain = matplotlib.image.imread('Gentask\Engine\eggheadplot4.png')
+            try:
+                eggbrain = matplotlib.image.imread('Engine' + os.path.sep + 'eggheadplot4.png')
+            except:
+                eggbrain = matplotlib.image.imread('Gentask' + os.path.sep + 'Engine' + os.path.sep + 'eggheadplot4.png')
         
         imgmask = eggbrain[:,:,0] == eggbrain[:,:,1];
         eggbrain[imgmask == 0, 3] = 0      # 100% transparent
@@ -3352,7 +3364,7 @@ def reportingwindow(eggs=None, waveforms=None, bars=None, alternatelabelsat=2, c
                 barsubplot(values = bars[cA].values, scale = bars[cA].scale, ax = axbarsub, colorscale = None, biggerisbetter = bars[cA].biggerisbetter, labels = bars[cA].labels, units = bars[cA].unit, title = bars[cA].title, plotvalue = True, alternatelabelsat=alternatelabelsat, axfontsize=axfontsize, labelfontsize=labelfontsize, valuefontsize=valuefontsize)
             
         if fileout != None:
-            matplotlib.pyplot.savefig(fileout, dpi=90, transparent=False, bbox_inches=None, pad_inches=0.1, frameon=None, metadata=None)
+            matplotlib.pyplot.savefig(fileout, dpi=90, transparent=False, bbox_inches=None, pad_inches=0.1, metadata=None)
             
         matplotlib.pyplot.show()
 

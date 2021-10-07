@@ -1,6 +1,5 @@
 import os
 import Engine.xcat as xcat
-from Engine.basicstimuluspresentationengine import Engine
 import Engine.eegpipe as eegpipe
 import numpy
 import scipy
@@ -975,6 +974,9 @@ def checkcontinousn2backperf(task, show=True):
     
     return [eggchunk, wavechunk, barchunks] 
 
+class Engine():
+    def __init__(self):
+        self.finished = True
 
 if __name__ == "__main__":
     # Unicorn multiprocessing will not run in Spyder 
