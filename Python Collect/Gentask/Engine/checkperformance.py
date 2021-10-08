@@ -1,6 +1,13 @@
 import os
-import Engine.xcat as xcat
-import Engine.eegpipe as eegpipe
+from sys import platform
+try:
+    import Engine.xcat as xcat
+except:
+    import xcat as xcat
+try:
+    import Engine.eegpipe as eegpipe
+except:
+    import eegpipe as eegpipe
 import numpy
 import scipy
 from tkinter import Tk     # from tkinter import Tk for Python 3.x
@@ -13,8 +20,13 @@ from PIL import ImageTk
 import time
 from threading import Thread
 from multiprocessing import Queue
+import gc
+
+
+
 
 def performancereporter(task):
+    gc.collect()
     eggchunk = None
     wavechunk = None
     barchunks = None
@@ -32,8 +44,9 @@ def performancereporter(task):
     # pull the processor result    
     [eggchunk, wavechunk, barchunks] = waitscr.result
     if not ((eggchunk == None) and (wavechunk == None) and (barchunks == None)):
-        eegpipe.reportingwindow(eggs=eggchunk, waveforms=wavechunk, bars=barchunks, fileout = task.outputfile.split('.')[0] + '.png')
-
+        fig = matplotlib.pyplot.figure(figsize=(20, 12))
+        eegpipe.reportingwindow(fig, eggs=eggchunk, waveforms=wavechunk, bars=barchunks, fileout=task.outputfile.split('.')[0] + '.png')
+        matplotlib.pyplot.show()
 
 
 class alternatethread():
@@ -100,14 +113,14 @@ class waitscreen():
         header2 = tkinter.Frame(master=self.window, width=self.winsize[0], height=numpy.multiply(self.winsize[1],0.1), bg="white")
         body = tkinter.Frame(master=self.window, width=self.winsize[0], height=numpy.multiply(self.winsize[1],0.7), bg="white")
         
-        header2text = tkinter.Label(master=header2, text='processing...', fg='gray', font=(None, 25),
+        header2text = tkinter.Label(master=header2, text='processing...', fg='gray', font=(None, 25), bg="white",
                                  justify='center', anchor='center', 
                                  width=int(numpy.multiply(self.winsize[0],0.09)))
         
         footer = tkinter.Frame(master=self.window, width=self.winsize[0], height=numpy.multiply(self.winsize[1],0.1), bg="white")
        
-        frame = tkinter.Frame(self.window)
-        self.canvas = tkinter.Canvas(frame, bg="white", width=self.winsize[0], height=numpy.multiply(self.winsize[1],0.7))
+        frame = tkinter.Frame(self.window, bg="white", borderwidth=0, highlightthickness=0)
+        self.canvas = tkinter.Canvas(frame, bg="white", width=self.winsize[0], height=numpy.multiply(self.winsize[1],0.7),borderwidth=0, highlightthickness=0)
         photoimage = []
         try:
             photoimage = ImageTk.PhotoImage(file="eggheadframe1.png")
@@ -120,21 +133,21 @@ class waitscreen():
             self.canvas.create_image(self.winsize[0]/2 + self.winsize[0]/5, numpy.multiply(self.winsize[1],0.7)/2, image=photoimage, anchor="center")
         except:
             pass
-        self.window.columnconfigure(0, weight=1, minsize=self.winsize[0])
+        self.window.columnconfigure(0, weight=0, minsize=self.winsize[0])
         header.grid(row=0, column=0, sticky="nsew")
         header2text.grid(row=1, column=0, sticky="nsew")
         header2.grid(row=1, column=0, sticky="nsew")
         
         frame.grid(row=2, column=0, sticky="nsew")
-        self.canvas.grid(row=2, column=0, sticky="nsew")
+        self.canvas.grid(row=2, column=0, sticky="ew")
         body.grid(row=2, column=0, sticky="nsew")
         
         footer.grid(row=3, column=0, sticky="nsew")
         
-        self.window.rowconfigure(0, weight=1, minsize=numpy.multiply(self.winsize[1],0.1))
-        self.window.rowconfigure(1, weight=1, minsize=numpy.multiply(self.winsize[1],0.2))
-        self.window.rowconfigure(2, weight=1, minsize=numpy.multiply(self.winsize[1],0.7))
-        self.window.rowconfigure(3, weight=1, minsize=numpy.multiply(self.winsize[1],0.1))
+        self.window.rowconfigure(0, weight=0, minsize=numpy.multiply(self.winsize[1],0.1))
+        self.window.rowconfigure(1, weight=0, minsize=numpy.multiply(self.winsize[1],0.2))
+        self.window.rowconfigure(2, weight=0, minsize=numpy.multiply(self.winsize[1],0.7))
+        self.window.rowconfigure(3, weight=0, minsize=numpy.multiply(self.winsize[1],0.1))
         
         [x, y] = centerprompt(self.window)
         
@@ -167,14 +180,14 @@ class waitscreen():
     def animate_scan(self):
         self.x0 = self.winsize[0]/2
         self.y0 = numpy.multiply(self.winsize[1],0.7)/2
-        self.scan = self.canvas.create_rectangle(self.x0-10, self.y0, self.x0+165, self.y0+8, outline="#00ff11", fill="#00ff11", stipple="gray25")
-        yinc = 1.5
+        self.scan = self.canvas.create_rectangle(self.x0-10, self.y0, self.x0+165, self.y0+8, outline="#0DB14B", fill="#0DB14B")
+        yinc = 2
         #xinc = 5
         
         while not self._close:
             self.canvas.move(self.scan,0,yinc)
             self.window.update()
-            time.sleep(0.01)
+            time.sleep(0.09)
             
             if not self._close:
                 scan_pos = self.canvas.coords(self.scan)
@@ -339,7 +352,6 @@ def checkoddballperf(task, show=True):
             
             # snag egghead
             #outputamplitude = eegpipe.extractamplitude(EEGdist, Window=[0.300, 0.600], Approach='mean')
-            [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
             distractoregg = eegpipe.eggheadplotprep()
             distractoregg.title = 'Orientation'
             distractoregg.channels = outputchannels
@@ -425,7 +437,6 @@ def checkoddballperf(task, show=True):
             
             # snag egghead
             #outputamplitude = eegpipe.extractamplitude(EEGdist, Window=[0.300, 0.600], Approach='mean')
-            [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
             targetegg = eegpipe.eggheadplotprep()
             targetegg.title = 'Attention'
             targetegg.channels = outputchannels
@@ -608,7 +619,6 @@ def checkflankerperf(task, show=True):
                 
             # snag egghead
             #outputamplitude = eegpipe.extractamplitude(EEGdist, Window=[0.300, 0.600], Approach='mean')
-            [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
             targetegg = eegpipe.eggheadplotprep()
             targetegg.title = 'Attention'
             targetegg.channels = outputchannels
@@ -670,8 +680,8 @@ def checkflankerperf(task, show=True):
             # snag waveform
             errorwave = eegpipe.waveformplotprep()
             errorwave.title = 'Monitoring'
-            errorwave.x = EEGresp.times[eegpipe.closestidx(EEGresp.times, -0.300):eegpipe.closestidx(EEGresp.times, 0.600)]
-            errorwave.y = EEGresp.data[outputchannels.index('HOTSPOT')][eegpipe.closestidx(EEGresp.times, -0.300):eegpipe.closestidx(EEGresp.times, 0.600)]
+            errorwave.x = EEGresp.times[eegpipe.closestidx(EEGresp.times, -0.300):eegpipe.closestidx(EEGresp.times, 0.300)]
+            errorwave.y = EEGresp.data[outputchannels.index('HOTSPOT')][eegpipe.closestidx(EEGresp.times, -0.300):eegpipe.closestidx(EEGresp.times, 0.300)]
             errorwave.linestyle='solid'
             errorwave.linecolor= '#EF9A35'
             errorwave.lineweight=2
@@ -685,8 +695,8 @@ def checkflankerperf(task, show=True):
                 
             ErrReference = eegpipe.waveformplotprep()
             ErrReference.title = 'Monitoring Reference'
-            ErrReference.x = xtime[eegpipe.closestidx(xtime, -0.300):eegpipe.closestidx(xtime, 0.600)]
-            ErrReference.y = numpy.multiply(outsum,8)[eegpipe.closestidx(xtime, -0.300):eegpipe.closestidx(xtime, 0.600)]
+            ErrReference.x = xtime[eegpipe.closestidx(xtime, -0.300):eegpipe.closestidx(xtime, 0.300)]
+            ErrReference.y = numpy.multiply(outsum,8)[eegpipe.closestidx(xtime, -0.300):eegpipe.closestidx(xtime, 0.300)]
             ErrReference.linestyle='dashed'
             ErrReference.linecolor= '#999999'
             ErrReference.lineweight=0.5
@@ -697,7 +707,6 @@ def checkflankerperf(task, show=True):
             
             # snag egghead
             #outputamplitude = eegpipe.extractamplitude(EEGdist, Window=[0.300, 0.600], Approach='mean')
-            [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
             erroregg = eegpipe.eggheadplotprep()
             erroregg.title = 'Monitoring'
             erroregg.channels = outputchannels
@@ -887,7 +896,6 @@ def checkn2backperf(task, show=True):
             
             # snag egghead
             #outputamplitude = eegpipe.extractamplitude(EEGdist, Window=[0.300, 0.600], Approach='mean')
-            [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
             targetegg = eegpipe.eggheadplotprep()
             targetegg.title = 'Attention'
             targetegg.channels = outputchannels
@@ -947,8 +955,8 @@ def checkn2backperf(task, show=True):
             # snag waveform
             errorwave = eegpipe.waveformplotprep()
             errorwave.title = 'Monitoring'
-            errorwave.x = EEGresp.times[eegpipe.closestidx(EEGresp.times, -0.300):eegpipe.closestidx(EEGresp.times, 0.600)]
-            errorwave.y = EEGresp.data[outputchannels.index('HOTSPOT')][eegpipe.closestidx(EEGresp.times, -0.300):eegpipe.closestidx(EEGresp.times, 0.600)]
+            errorwave.x = EEGresp.times[eegpipe.closestidx(EEGresp.times, -0.300):eegpipe.closestidx(EEGresp.times, 0.300)]
+            errorwave.y = EEGresp.data[outputchannels.index('HOTSPOT')][eegpipe.closestidx(EEGresp.times, -0.300):eegpipe.closestidx(EEGresp.times, 0.300)]
             errorwave.linestyle='solid'
             errorwave.linecolor= '#EF9A35'
             errorwave.lineweight=2
@@ -962,8 +970,8 @@ def checkn2backperf(task, show=True):
                 
             ErrReference = eegpipe.waveformplotprep()
             ErrReference.title = 'Monitoring Reference'
-            ErrReference.x = xtime[eegpipe.closestidx(xtime, -0.300):eegpipe.closestidx(xtime, 0.600)]
-            ErrReference.y = numpy.multiply(outsum,8)[eegpipe.closestidx(xtime, -0.300):eegpipe.closestidx(xtime, 0.600)]
+            ErrReference.x = xtime[eegpipe.closestidx(xtime, -0.300):eegpipe.closestidx(xtime, 0.300)]
+            ErrReference.y = numpy.multiply(outsum,8)[eegpipe.closestidx(xtime, -0.300):eegpipe.closestidx(xtime, 0.300)]
             ErrReference.linestyle='dashed'
             ErrReference.linecolor= '#999999'
             ErrReference.lineweight=0.5
@@ -974,7 +982,6 @@ def checkn2backperf(task, show=True):
             
             # snag egghead
             #outputamplitude = eegpipe.extractamplitude(EEGdist, Window=[0.300, 0.600], Approach='mean')
-            [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
             erroregg = eegpipe.eggheadplotprep()
             erroregg.title = 'Monitoring'
             erroregg.channels = outputchannels
@@ -1096,8 +1103,8 @@ def checkcontinousn2backperf(task, show=True):
             # snag waveform
             errorwave = eegpipe.waveformplotprep()
             errorwave.title = 'Monitoring'
-            errorwave.x = EEGresp.times[eegpipe.closestidx(EEGresp.times, -0.300):eegpipe.closestidx(EEGresp.times, 0.600)]
-            errorwave.y = EEGresp.data[outputchannels.index('HOTSPOT')][eegpipe.closestidx(EEGresp.times, -0.300):eegpipe.closestidx(EEGresp.times, 0.600)]
+            errorwave.x = EEGresp.times[eegpipe.closestidx(EEGresp.times, -0.300):eegpipe.closestidx(EEGresp.times, 0.300)]
+            errorwave.y = EEGresp.data[outputchannels.index('HOTSPOT')][eegpipe.closestidx(EEGresp.times, -0.300):eegpipe.closestidx(EEGresp.times, 0.300)]
             errorwave.linestyle='solid'
             errorwave.linecolor= '#EF9A35'
             errorwave.lineweight=2
@@ -1111,8 +1118,8 @@ def checkcontinousn2backperf(task, show=True):
                 
             ErrReference = eegpipe.waveformplotprep()
             ErrReference.title = 'Reference'
-            ErrReference.x = xtime[eegpipe.closestidx(xtime, -0.300):eegpipe.closestidx(xtime, 0.600)]
-            ErrReference.y = numpy.multiply(outsum,8)[eegpipe.closestidx(xtime, -0.300):eegpipe.closestidx(xtime, 0.600)]
+            ErrReference.x = xtime[eegpipe.closestidx(xtime, -0.300):eegpipe.closestidx(xtime, 0.300)]
+            ErrReference.y = numpy.multiply(outsum,8)[eegpipe.closestidx(xtime, -0.300):eegpipe.closestidx(xtime, 0.300)]
             ErrReference.linestyle='dashed'
             ErrReference.linecolor= '#999999'
             ErrReference.lineweight=0.5
@@ -1123,7 +1130,6 @@ def checkcontinousn2backperf(task, show=True):
             
             # snag egghead
             #outputamplitude = eegpipe.extractamplitude(EEGdist, Window=[0.300, 0.600], Approach='mean')
-            [outputchannels, outputamplitude] = eegpipe.eggpad(outputchannels, outputamplitude)
             erroregg = eegpipe.eggheadplotprep()
             erroregg.title = 'Monitoring'
             erroregg.channels = outputchannels
@@ -1144,19 +1150,17 @@ def checkcontinousn2backperf(task, show=True):
 class Engine():
     def __init__(self):
         self.finished = True
-
+        
 if __name__ == "__main__":
-    # Unicorn multiprocessing will not run in Spyder 
-    # Run -> Configuration per file... 
-    # Change the Console to Execute in an external system terminal
-    # Select the checkbox for External system terminal Interact with the Python console after execution
-    
+
     task = Engine()
-    task.finished = True
-    Tk().withdraw() # we don't want a full GUI, so keep the root window from appearing
+    root = Tk()
+    root.lift()
+    root.wm_attributes('-topmost',1)
+    root.withdraw()
     filename = askopenfilename(filetypes=[("PythonCollect", "*.psydat"),("OddballTask", "OB*.psydat"), ("FlankerTask", "FT*.psydat"), ("N2backTask", "N2B*.psydat"), ("ContN2backTask", "CN2B*.psydat"), ("All", "*")])  # show an "Open" dialog box and return the path to the selected file
-    task.outputfile = filename.split('.')[0] + '.psydat'
-    #task.outputfile = r'Raw\OBLauren.psydat'
-    
-    performancereporter(task)
+    root.destroy()
+    if len(filename) > 0:
+        task.outputfile = filename.split('.')[0] + '.psydat'
+        performancereporter(task)
     

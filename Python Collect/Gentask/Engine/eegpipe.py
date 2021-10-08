@@ -49,10 +49,10 @@ from peakutils.plot import plot as peakutilspplot
 # %matplotlib inline
 #%matplotlib qt
 
-
-def version():
-    print('eegpipe toolbox version 0.1, updated 2020-12-29')
-    # 0.1
+def vectorlength(group1, group2):
+    asquare = numpy.square(numpy.absolute(numpy.subtract(group2[0], group1[0])))
+    bsquare = numpy.square(numpy.absolute(numpy.subtract(group2[1], group1[1])))
+    return numpy.sqrt(numpy.add(asquare,bsquare))
 
 
 
@@ -127,18 +127,158 @@ def crushparula(mapsize=False):
     
     return newcmap
     
-def eggpad(Channels, Amplitude):
-    
+def eggsub10(Channels, Amplitude, searchlimit=300, levels=1):
+    completechanlabs = ['NZ','IZ','P9','P10','T9','T10','F9','F10', 'FP1','FPZ','FP2','AFP5','AFP3','AFP1','AFP2','AFP4','AFP6','AF7','AF7h','AF5','AF5h','AF3','AF1','AF1h','AFZ','AF2h','AF2','AF4','AF6h','AF6','AF8h','AF8','AFF7','AFF7h','AFF5','AFF5h','AFF3','AFF3h','AFF1h','AFF2h','AFF4h','AFF4','AFF6h','AFF6','AFF8h','AFF8','F7','F7h','F5','F5h','F3','F3h','F1','F1h','FZ','F2h','F2','F4h','F4','F6h','F6','F8h','F8','FFT7','FFT7h','FFC5','FFC5h','FFC3','FFC3h','FFC1','FFC1h','FFCZ','FFC2h','FFC2','FFC4h','FFC4','FFC6h','FFC6','FFT8h','FFT8','FT7','FT7h','FC5','FC5h','FC3','FC3h','FC1','FC1h','FCZ','FC2h','FC2','FC4h','FC4','FC6h','FC6','FT8h','FT8','FTT7','FTT7h','FCC5','FCC5h','FCC3','FCC3h','FCC1','FCC1h','FCCZ','FCC2h','FCC2','FCC4h','FCC4','FCC6h','FCC6','FTT8h','FTT8','T7','T7h','C5','C5h','C3','C3h','C1','C1h','CZ','C2h','C2','C4h','C4','C6h','C6','T8h','T8','TTP7','TTP7h','CCP5','CCP5h','CCP3','CCP3h','CCP1','CCP1h','CCPZ','CCP2h','CCP2','CCP4h','CCP4','CCP6h','CCP6','TTP8h','TTP8','TP7','TP7h','CP5','CP5h','CP3','CP3h','CP1','CP1h','CPZ','CP2h','CP2','CP4h','CP4','CP6h','CP6','TP8h','TP8','TPP7','TPP7h','CPP5','CPP5h','CPP3','CPP3h','CPP1','CPP1h','CPPZ','CPP2h','CPP2','CPP4h','CPP4','CPP6h','CPP6','TPP8h','TPP8','P7','P7h','P5','P5h','P3','P3h','P1','P1h','PZ','P2h','P2','P4h','P4','P6h','P6','P8h','P8','PPO7','PPO7h','PPO5','PPO5h','PPO3','PPO3h','PPO1','PPO1h','PPOZ','PPO2h','PPO2','PPO4h','PPO4','PPO6h','PPO6','PPO8h','PPO8','PO7','PO7h','PO5','PO5h','PO3','PO3h','PO1','POZ','PO2','PO4h','PO4','PO6h','PO6','PO8h','PO8','POO5','POO3','POO1','POOZ','POO2','POO4','POO6','O1','O1h','OZ','O2h','O2','MiPf','MiCe','MiPa','MiOc','LLPf','LLFr','LLTe','LLOc','RLPf','RLFr','RLTe','RLOc','LMPf','LDFr','LDCe','LDPa','LMOc','RMPf','RDFr','RDCe','RDPa','RMOc','LMFr','LMCe','RMFr','RMCe']
+    completechanlabsupper = copy.deepcopy(completechanlabs)
+    completechanlabsupper = [x.upper() for x in completechanlabsupper]
+    completexvect = [-3,-3,-361,355,-380,370,-361,355, -79,-3,73,-148,-97,-42,36,91,142,-216,-182,-148,-113,-79,-57,-34,-3,28,51,73,107,142,176,210,-235,-209,-184,-150,-113,-79,-36,30,73,107,144,178,203,229,-254,-235,-216,-187,-155,-116,-79,-37,-3,31,73,110,149,182,210,230,248,-282,-256,-229,-198,-164,-126,-85,-44,-3,38,79,120,158,193,223,250,276,-309,-278,-245,-211,-178,-134,-91,-47,-3,41,86,128,172,205,238,272,303,-331,-295,-260,-224,-185,-142,-96,-49,-3,44,90,136,179,218,255,289,325,-349,-315,-278,-238,-198,-147,-100,-51,-3,45,94,141,192,233,272,309,343,-352,-315,-280,-243,-199,-149,-100,-52,-3,46,94,143,193,236,274,309,347,-341,-311,-280,-238,-198,-148,-100,-50,-3,44,94,142,192,232,275,305,335,-309,-277,-248,-214,-175,-134,-90,-47,-3,41,84,128,170,208,242,271,303,-258,-238,-219,-189,-157,-125,-80,-42,-3,36,74,119,151,183,213,233,252,-215,-197,-176,-148,-115,-79,-54,-28,-3,22,48,73,110,142,170,191,209,-172,-156,-141,-109,-77,-41,-22,-3,16,35,71,103,135,150,166,-125,-93,-41,-3,35,87,119,-79,-41,-3,35,73,-3,-3,-3,-3,-196,-300,-341,-215,190,294,335,209,-79,-198,-238,-214,-91,73,193,233,208,86,-91,-149,86,143]
+    completeyvect = [415,-465,-380,-380,28,28,337,337, 398,402,398,387,372,370,370,372,387,359,346,343,341,337,337,337,337,337,337,337,341,343,346,359,332,324,317,313,311,308,308,308,308,311,313,317,324,332,305,296,291,286,282,279,276,274,273,274,276,279,282,286,291,296,305,252,239,228,219,213,209,205,200,199,200,205,209,213,219,228,239,252,199,176,162,150,143,137,134,129,126,129,134,137,143,150,162,176,199,114,99,86,77,70,64,60,56,52,56,60,64,70,77,86,99,114,28,13,6,1,-5,-10,-16,-18,-21,-18,-16,-10,-5,1,6,13,28,-62,-65,-67,-69,-71,-72,-74,-75,-75,-75,-74,-72,-71,-69,-67,-65,-62,-151,-147,-141,-137,-136,-133,-132,-130,-129,-130,-132,-133,-136,-137,-141,-147,-151,-220,-210,-204,-200,-195,-191,-188,-185,-183,-185,-188,-191,-195,-200,-204,-210,-220,-289,-274,-266,-260,-255,-248,-243,-239,-237,-239,-243,-248,-255,-260,-266,-274,-289,-328,-318,-309,-304,-299,-295,-293,-291,-289,-291,-293,-295,-299,-304,-309,-318,-328,-367,-356,-350,-345,-344,-342,-342,-341,-342,-342,-344,-345,-350,-356,-367,-384,-371,-369,-369,-369,-371,-384,-393,-395,-397,-395,-393,402,-21,-183,-397,345,176,-151,-328,345,176,-151,-328,308,219,1,-200,-293,308,219,1,-200,-293,134,-72,134,-72]
+
+    # figure out coordinates of what we do have
+    origchanlength = len(Channels)
+    chanvect = []
+    xvect = []
+    yvect = []
+    for cChan in range(origchanlength):
+        try:
+            matchindex = completechanlabs.index(Channels[cChan].upper())
+            xvect.append(completexvect[matchindex])
+            yvect.append(completeyvect[matchindex])
+            chanvect.append(Channels[cChan].upper())
+        except:
+            pass
+    origchanlength = len(chanvect)
+
+    if levels > 0:
+        # find potential data
+        overallchanlabs = ['FZ', 'F3', 'F4', 'CZ', 'C3', 'C4', 'PZ', 'P3', 'P4']
+        for cChan in range(len(overallchanlabs)):
+            try:
+                matchindex = chanvect.index(overallchanlabs[cChan].upper())
+            except:
+                # channel is not included
+                matchindex = completechanlabs.index(overallchanlabs[cChan].upper())
+                # find distance between that channel and included channels
+                vectors = []
+                for vChan in range(origchanlength):
+                    vectors.append(vectorlength([completexvect[matchindex], completeyvect[matchindex]], [xvect[vChan],yvect[vChan]]))
+                
+                availvectors = [i for i,v in enumerate(vectors) if v < float(searchlimit)]
+                if len(availvectors) > 2:
+                    # find total distance
+                    sumtot = 0
+                    vectorweights = [0] * len(availvectors)
+                    for vChan in range(len(availvectors)):
+                        vectorweights[vChan] = numpy.subtract(float(searchlimit), vectors[availvectors[vChan]])
+                        sumtot = numpy.add(sumtot, vectorweights[vChan])
+                    # weight each vector based upon distance
+                    for vChan in range(len(availvectors)):
+                        vectorweights[vChan] = numpy.divide(vectorweights[vChan], sumtot)
+                        matchindex = Channels.index(chanvect[availvectors[vChan]])
+                        vectorweights[vChan] = numpy.multiply(Amplitude[matchindex],vectorweights[vChan])
+                    
+                    Channels.append(overallchanlabs[cChan])
+                    Amplitude.append(numpy.sum(numpy.array(vectorweights)))
+                    
+    if levels > 1:
+        origchanlength = len(Channels)
+        chanvect = []
+        xvect = []
+        yvect = []
+        for cChan in range(origchanlength):
+            try:
+                matchindex = completechanlabs.index(Channels[cChan].upper())
+                xvect.append(completexvect[matchindex])
+                yvect.append(completeyvect[matchindex])
+                chanvect.append(Channels[cChan].upper())
+            except:
+                pass
+        origchanlength = len(chanvect)
+        # find potential data
+        overallchanlabs = ['AFZ', 'FCZ', 'CPZ', 'POZ', 'F1', 'F2', 'C1', 'C2', 'P1', 'P2', 'FC3', 'FC4', 'CP1', 'CP2']
+        for cChan in range(len(overallchanlabs)):
+            try:
+                matchindex = chanvect.index(overallchanlabs[cChan].upper())
+            except:
+                # channel is not included
+                matchindex = completechanlabs.index(overallchanlabs[cChan].upper())
+                # find distance between that channel and included channels
+                vectors = []
+                for vChan in range(origchanlength):
+                    vectors.append(vectorlength([completexvect[matchindex], completeyvect[matchindex]], [xvect[vChan],yvect[vChan]]))
+                
+                availvectors = [i for i,v in enumerate(vectors) if v < float(searchlimit)]
+                if len(availvectors) > 2:
+                    # find total distance
+                    sumtot = 0
+                    vectorweights = [0] * len(availvectors)
+                    for vChan in range(len(availvectors)):
+                        vectorweights[vChan] = numpy.subtract(float(searchlimit), vectors[availvectors[vChan]])
+                        sumtot = numpy.add(sumtot, vectorweights[vChan])
+                    # weight each vector based upon distance
+                    for vChan in range(len(availvectors)):
+                        vectorweights[vChan] = numpy.divide(vectorweights[vChan], sumtot)
+                        matchindex = Channels.index(chanvect[availvectors[vChan]])
+                        vectorweights[vChan] = numpy.multiply(Amplitude[matchindex],vectorweights[vChan])
+                    
+                    Channels.append(overallchanlabs[cChan])
+                    Amplitude.append(numpy.sum(numpy.array(vectorweights)))
+                
+    return [Channels, Amplitude]
+
+def eegpad(Channels, Amplitude, searchlimit=500):
+    completechanlabs = ['NZ','IZ','P9','P10','T9','T10','F9','F10', 'FP1','FPZ','FP2','AFP5','AFP3','AFP1','AFP2','AFP4','AFP6','AF7','AF7h','AF5','AF5h','AF3','AF1','AF1h','AFZ','AF2h','AF2','AF4','AF6h','AF6','AF8h','AF8','AFF7','AFF7h','AFF5','AFF5h','AFF3','AFF3h','AFF1h','AFF2h','AFF4h','AFF4','AFF6h','AFF6','AFF8h','AFF8','F7','F7h','F5','F5h','F3','F3h','F1','F1h','FZ','F2h','F2','F4h','F4','F6h','F6','F8h','F8','FFT7','FFT7h','FFC5','FFC5h','FFC3','FFC3h','FFC1','FFC1h','FFCZ','FFC2h','FFC2','FFC4h','FFC4','FFC6h','FFC6','FFT8h','FFT8','FT7','FT7h','FC5','FC5h','FC3','FC3h','FC1','FC1h','FCZ','FC2h','FC2','FC4h','FC4','FC6h','FC6','FT8h','FT8','FTT7','FTT7h','FCC5','FCC5h','FCC3','FCC3h','FCC1','FCC1h','FCCZ','FCC2h','FCC2','FCC4h','FCC4','FCC6h','FCC6','FTT8h','FTT8','T7','T7h','C5','C5h','C3','C3h','C1','C1h','CZ','C2h','C2','C4h','C4','C6h','C6','T8h','T8','TTP7','TTP7h','CCP5','CCP5h','CCP3','CCP3h','CCP1','CCP1h','CCPZ','CCP2h','CCP2','CCP4h','CCP4','CCP6h','CCP6','TTP8h','TTP8','TP7','TP7h','CP5','CP5h','CP3','CP3h','CP1','CP1h','CPZ','CP2h','CP2','CP4h','CP4','CP6h','CP6','TP8h','TP8','TPP7','TPP7h','CPP5','CPP5h','CPP3','CPP3h','CPP1','CPP1h','CPPZ','CPP2h','CPP2','CPP4h','CPP4','CPP6h','CPP6','TPP8h','TPP8','P7','P7h','P5','P5h','P3','P3h','P1','P1h','PZ','P2h','P2','P4h','P4','P6h','P6','P8h','P8','PPO7','PPO7h','PPO5','PPO5h','PPO3','PPO3h','PPO1','PPO1h','PPOZ','PPO2h','PPO2','PPO4h','PPO4','PPO6h','PPO6','PPO8h','PPO8','PO7','PO7h','PO5','PO5h','PO3','PO3h','PO1','POZ','PO2','PO4h','PO4','PO6h','PO6','PO8h','PO8','POO5','POO3','POO1','POOZ','POO2','POO4','POO6','O1','O1h','OZ','O2h','O2','MiPf','MiCe','MiPa','MiOc','LLPf','LLFr','LLTe','LLOc','RLPf','RLFr','RLTe','RLOc','LMPf','LDFr','LDCe','LDPa','LMOc','RMPf','RDFr','RDCe','RDPa','RMOc','LMFr','LMCe','RMFr','RMCe']
+    completechanlabsupper = copy.deepcopy(completechanlabs)
+    completechanlabsupper = [x.upper() for x in completechanlabsupper]
+    completexvect = [-3,-3,-361,355,-380,370,-361,355, -79,-3,73,-148,-97,-42,36,91,142,-216,-182,-148,-113,-79,-57,-34,-3,28,51,73,107,142,176,210,-235,-209,-184,-150,-113,-79,-36,30,73,107,144,178,203,229,-254,-235,-216,-187,-155,-116,-79,-37,-3,31,73,110,149,182,210,230,248,-282,-256,-229,-198,-164,-126,-85,-44,-3,38,79,120,158,193,223,250,276,-309,-278,-245,-211,-178,-134,-91,-47,-3,41,86,128,172,205,238,272,303,-331,-295,-260,-224,-185,-142,-96,-49,-3,44,90,136,179,218,255,289,325,-349,-315,-278,-238,-198,-147,-100,-51,-3,45,94,141,192,233,272,309,343,-352,-315,-280,-243,-199,-149,-100,-52,-3,46,94,143,193,236,274,309,347,-341,-311,-280,-238,-198,-148,-100,-50,-3,44,94,142,192,232,275,305,335,-309,-277,-248,-214,-175,-134,-90,-47,-3,41,84,128,170,208,242,271,303,-258,-238,-219,-189,-157,-125,-80,-42,-3,36,74,119,151,183,213,233,252,-215,-197,-176,-148,-115,-79,-54,-28,-3,22,48,73,110,142,170,191,209,-172,-156,-141,-109,-77,-41,-22,-3,16,35,71,103,135,150,166,-125,-93,-41,-3,35,87,119,-79,-41,-3,35,73,-3,-3,-3,-3,-196,-300,-341,-215,190,294,335,209,-79,-198,-238,-214,-91,73,193,233,208,86,-91,-149,86,143]
+    completeyvect = [415,-465,-380,-380,28,28,337,337, 398,402,398,387,372,370,370,372,387,359,346,343,341,337,337,337,337,337,337,337,341,343,346,359,332,324,317,313,311,308,308,308,308,311,313,317,324,332,305,296,291,286,282,279,276,274,273,274,276,279,282,286,291,296,305,252,239,228,219,213,209,205,200,199,200,205,209,213,219,228,239,252,199,176,162,150,143,137,134,129,126,129,134,137,143,150,162,176,199,114,99,86,77,70,64,60,56,52,56,60,64,70,77,86,99,114,28,13,6,1,-5,-10,-16,-18,-21,-18,-16,-10,-5,1,6,13,28,-62,-65,-67,-69,-71,-72,-74,-75,-75,-75,-74,-72,-71,-69,-67,-65,-62,-151,-147,-141,-137,-136,-133,-132,-130,-129,-130,-132,-133,-136,-137,-141,-147,-151,-220,-210,-204,-200,-195,-191,-188,-185,-183,-185,-188,-191,-195,-200,-204,-210,-220,-289,-274,-266,-260,-255,-248,-243,-239,-237,-239,-243,-248,-255,-260,-266,-274,-289,-328,-318,-309,-304,-299,-295,-293,-291,-289,-291,-293,-295,-299,-304,-309,-318,-328,-367,-356,-350,-345,-344,-342,-342,-341,-342,-342,-344,-345,-350,-356,-367,-384,-371,-369,-369,-369,-371,-384,-393,-395,-397,-395,-393,402,-21,-183,-397,345,176,-151,-328,345,176,-151,-328,308,219,1,-200,-293,308,219,1,-200,-293,134,-72,134,-72]
+
+    # figure out coordinates of what we do have
+    origchanlength = len(Channels)
+    chanvect = []
+    xvect = []
+    yvect = []
+    for cChan in range(origchanlength):
+        try:
+            matchindex = completechanlabs.index(Channels[cChan].upper())
+            xvect.append(completexvect[matchindex])
+            yvect.append(completeyvect[matchindex])
+            chanvect.append(Channels[cChan].upper())
+        except:
+            pass
+    origchanlength = len(chanvect)
+
+    # find potential data
     overallchanlabs = ['NZ', 'IZ', 'F9', 'F10', 'T9', 'T10', 'P9', 'P10']
     for cChan in range(len(overallchanlabs)):
         try:
-            matchindex = Channels.index(overallchanlabs[cChan].upper())
+            matchindex = chanvect.index(overallchanlabs[cChan].upper())
         except:
-            Channels.append(overallchanlabs[cChan])
-            Amplitude.append(0.0)
-    
-    return [Channels, Amplitude]
+            # channel is not included
+            matchindex = completechanlabs.index(overallchanlabs[cChan].upper())
+            # find distance between that channel and included channels
+            vectors = []
+            for vChan in range(origchanlength):
+                vectors.append(vectorlength([completexvect[matchindex], completeyvect[matchindex]], [xvect[vChan],yvect[vChan]]))
+            
+            availvectors = [i for i,v in enumerate(vectors) if v < float(searchlimit)]
+            if len(availvectors) > 2:
+                # find total distance
+                sumtot = 0
+                vectorweights = [0] * len(availvectors)
+                for vChan in range(len(availvectors)):
+                    vectorweights[vChan] = numpy.subtract(float(searchlimit), vectors[availvectors[vChan]])
+                    sumtot = numpy.add(sumtot, vectorweights[vChan])
+                # weight each vector based upon distance
+                for vChan in range(len(availvectors)):
+                    vectorweights[vChan] = numpy.divide(vectorweights[vChan], sumtot)
+                    matchindex = Channels.index(chanvect[availvectors[vChan]])
+                    vectorweights[vChan] = numpy.multiply(Amplitude[matchindex],vectorweights[vChan])
+                
+                Channels.append(overallchanlabs[cChan])
+                Amplitude.append(numpy.sum(numpy.array(vectorweights)))
 
+    return [Channels, Amplitude]
 
 def eggheadplot(Channels, Amplitude, Steps=512, Scale=False, Colormap=False, Method='cubic', Complete=True, Style='Full', TickValues=False, BrainOpacity=0.2, Title=False, Electrodes=True, **kwargs):
 
@@ -210,10 +350,17 @@ def eggheadplot(Channels, Amplitude, Steps=512, Scale=False, Colormap=False, Met
     matplotlib.pyplot.show()
 
 
-def eggheadplot_sub(Channels, Amplitude, ax=None, Steps=512, Scale=False, Colormap=False, Method='cubic', Complete=True, Style='Full', BrainOpacity=0.2, Electrodes=True, **kwargs):
+def eggheadplot_sub(Channels, Amplitude, ax=None, Steps=512, Scale=False, Colormap=False, Method='cubic', Complete=True, Style='Full', BrainOpacity=0.2, Electrodes=True, Pad=True, Contours=False, **kwargs):
     
     Method = checkdefaultsettings(Method, ['cubic', 'linear'])
     Style = checkdefaultsettings(Style, ['Full', 'Outline', 'None'])
+    
+    realchannels = len(Channels)
+    if Pad != False:
+        [Channels, Amplitude] = eegpad(Channels, Amplitude)
+    if Contours == True:
+        Contours = 5
+    Contours = int(Contours)
     
     #matplotlib.pyplot.sca(ax)
     ax.spines['top'].set_visible(False)
@@ -309,18 +456,24 @@ def eggheadplot_sub(Channels, Amplitude, ax=None, Steps=512, Scale=False, Colorm
     if Complete:
         zi = fill(zi)
     
+    # gaussian kernal blurring
+    zi = scipy.ndimage.gaussian_filter(copy.deepcopy(numpy.multiply(zi,1.2)), sigma=2.5, order=0)
+    
     # plot the activity
     if Colormap == False:
         Colormap = matplotlib.pyplot.cm.viridis
     contourplot = matplotlib.pyplot.contourf(xi,yi,zi, Steps, cmap=Colormap, vmin=Scale[0], vmax=Scale[1])
+    if Contours != False:
+        contourplotridges = matplotlib.pyplot.contour(xi,yi,zi, Contours, colors='k', alpha=0.15)
     ax.autoscale(False)
+    
     
     if Electrodes != False:
         markervalue = 'k'
         if Electrodes != True:
             markervalue = Electrodes 
         
-        matplotlib.pyplot.plot(numpy.multiply(xvect, 0.85), numpy.add(numpy.multiply(yvect,0.8),-35), linestyle="None", marker = '.', color=markervalue)
+        matplotlib.pyplot.plot(numpy.multiply(xvect[0:realchannels], 0.85), numpy.add(numpy.multiply(yvect[0:realchannels],0.8),-35), linestyle="None", marker = '.', color=markervalue)
         
     extent = numpy.min(x), numpy.max(x), numpy.min(y), numpy.max(y)
     if Style.upper() == ('Full').upper():
@@ -3271,7 +3424,7 @@ def barsubplot(values, scale, ax=None, width=None, colorscale=None, units=None, 
 
 
 
-def reportingwindow(eggs=None, waveforms=None, bars=None, alternatelabelsat=2, colormap=None, tickvalues=None, waveformscale=None, waveformpositivedown=True, fileout=None):
+def reportingwindow(fig, eggs=None, waveforms=None, bars=None, alternatelabelsat=2, colormap=None, tickvalues=None, waveformscale=None, waveformpositivedown=True, fileout=None):
     
     if eggs != None or waveforms != None or bars != None:
         
@@ -3281,7 +3434,7 @@ def reportingwindow(eggs=None, waveforms=None, bars=None, alternatelabelsat=2, c
         #    fullstyle = True
         
         #if fullstyle:
-        fig = matplotlib.pyplot.figure(figsize=(20, 12))
+        #fig = matplotlib.pyplot.figure(figsize=(20, 12))
         #else:
         #    fig = matplotlib.pyplot.figure(figsize=(20, 8))
             
