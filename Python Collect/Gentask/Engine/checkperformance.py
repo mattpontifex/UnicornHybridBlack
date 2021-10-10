@@ -21,11 +21,62 @@ import time
 from threading import Thread
 from multiprocessing import Queue
 import gc
+from alive_progress import alive_bar
 
+from alive_progress.animations.spinners import alongside_spinner_factory, scrolling_spinner_factory
+#bouncing_spinner_factory, delayed_spinner_factory, frame_spinner_factory, \
+#scrolling_spinner_factory, sequential_spinner_factory
 
+#https://github.com/rsalmei/alive-progress
+#pip install alive-progress
 
 
 def performancereporter(task):
+    gc.collect()
+    showoutput = False
+    eggchunk = None
+    wavechunk = None
+    barchunks = None
+    _baractive = False
+    
+    # create custom theme to avoid using characters that will not show
+    _arrows_left = scrolling_spinner_factory('.·˂', 6, 3, right=False)
+    _arrows_right = scrolling_spinner_factory('.·˃', 6, 3, right=True)
+    arrows_in = alongside_spinner_factory(_arrows_right, _arrows_left)
+    
+    #with alive_bar(total=0, title='..processing...', unknown='arrows_in', spinner='classic', monitor=False, stats=True) as bar:
+    with alive_bar(total=0, title='..Loading and Processing data..', unknown=arrows_in, spinner='classic', monitor=False, stats=True) as bar:
+        _baractive = True
+    
+        filin = task.outputfile.split('.')[0]
+        filin = os.path.split(filin)[1]
+        if filin[0:2] == 'OB':
+            # oddball task
+            [eggchunk, wavechunk, barchunks] = checkoddballperf(task, showoutput)
+            
+        elif filin[0:2] == 'FT':
+            # flanker task
+            [eggchunk, wavechunk, barchunks] = checkflankerperf(task, showoutput)
+            
+        elif filin[0:3] == 'N2B':
+            # flanker task
+            [eggchunk, wavechunk, barchunks] = checkn2backperf(task, showoutput)
+            
+        elif filin[0:3] == 'CN2B':
+            # flanker task
+            [eggchunk, wavechunk, barchunks] = checkcontinousn2backperf(task, showoutput)
+      
+        if not ((eggchunk == None) and (wavechunk == None) and (barchunks == None)):
+            fig = matplotlib.pyplot.figure(figsize=(20, 12))
+            eegpipe.reportingwindow(fig, eggs=eggchunk, waveforms=wavechunk, bars=barchunks, fileout=task.outputfile.split('.')[0] + '.png')
+            bar()
+            _baractive = False
+            matplotlib.pyplot.show()
+    if _baractive:
+        bar()
+        
+
+def performancereporter_wait(task):
     gc.collect()
     eggchunk = None
     wavechunk = None
@@ -120,7 +171,11 @@ class waitscreen():
         footer = tkinter.Frame(master=self.window, width=self.winsize[0], height=numpy.multiply(self.winsize[1],0.1), bg="white")
        
         frame = tkinter.Frame(self.window, bg="white", borderwidth=0, highlightthickness=0)
-        self.canvas = tkinter.Canvas(frame, bg="white", width=self.winsize[0], height=numpy.multiply(self.winsize[1],0.7),borderwidth=0, highlightthickness=0)
+        if platform == "linux" or platform == "linux2" or platform == "darwin":
+            # OS X
+            self.canvas = tkinter.Canvas(frame, bg="white", width=self.winsize[0], height=numpy.multiply(self.winsize[1],0.7),borderwidth=0, highlightthickness=0)
+        elif platform == "win32":
+            self.canvas = tkinter.Canvas(frame, bg="white", width=self.winsize[0]*1.1, height=numpy.multiply(self.winsize[1],0.7),borderwidth=0, highlightthickness=0)
         photoimage = []
         try:
             photoimage = ImageTk.PhotoImage(file="eggheadframe1.png")
@@ -130,7 +185,11 @@ class waitscreen():
             except:
                 photoimage = ImageTk.PhotoImage(file="Gentask" + os.path.sep + "Engine" + os.path.sep + "eggheadframe1.png")
         try:
-            self.canvas.create_image(self.winsize[0]/2 + self.winsize[0]/5, numpy.multiply(self.winsize[1],0.7)/2, image=photoimage, anchor="center")
+            if platform == "linux" or platform == "linux2" or platform == "darwin":
+                # OS X
+                self.canvas.create_image(self.winsize[0]/2 + self.winsize[0]/5, numpy.multiply(self.winsize[1],0.7)/2, image=photoimage, anchor="center")
+            elif platform == "win32":    
+                self.canvas.create_image(self.winsize[0]/2 + self.winsize[0]/3, numpy.multiply(self.winsize[1],0.7)/2, image=photoimage, anchor="center")
         except:
             pass
         self.window.columnconfigure(0, weight=0, minsize=self.winsize[0])
@@ -139,7 +198,7 @@ class waitscreen():
         header2.grid(row=1, column=0, sticky="nsew")
         
         frame.grid(row=2, column=0, sticky="nsew")
-        self.canvas.grid(row=2, column=0, sticky="ew")
+        self.canvas.grid(row=2, column=0, sticky="nsew")
         body.grid(row=2, column=0, sticky="nsew")
         
         footer.grid(row=3, column=0, sticky="nsew")
@@ -180,14 +239,17 @@ class waitscreen():
     def animate_scan(self):
         self.x0 = self.winsize[0]/2
         self.y0 = numpy.multiply(self.winsize[1],0.7)/2
-        self.scan = self.canvas.create_rectangle(self.x0-10, self.y0, self.x0+165, self.y0+8, outline="#0DB14B", fill="#0DB14B")
+        if platform == "linux" or platform == "linux2" or platform == "darwin":
+            self.scan = self.canvas.create_rectangle(self.x0-10, self.y0, self.x0+165, self.y0+8, outline="#0DB14B", fill="#0DB14B")
+        elif platform == "win32":
+            self.scan = self.canvas.create_rectangle(self.x0+30, self.y0, self.x0+300, self.y0+8, outline="#0DB14B", fill="#0DB14B")
         yinc = 2
         #xinc = 5
         
         while not self._close:
             self.canvas.move(self.scan,0,yinc)
             self.window.update()
-            time.sleep(0.09)
+            time.sleep(0.01)
             
             if not self._close:
                 scan_pos = self.canvas.coords(self.scan)

@@ -3208,7 +3208,7 @@ class waveformplotprep():
         self.lineweight = 2
         self.fillbetween = None
         self.fillbetweencolor = 'k'
-        self.fillbetweenopacity = 0.1
+        self.fillbetweenopacity = 0.6
         self.fillwindow = None  
         
 
