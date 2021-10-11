@@ -15,8 +15,8 @@ if __name__ == "__main__":
     task.instructioncard = ['FlankerPrac1.png', 'FlankerPrac2.png', 'FlankerPrac3.png', 'FlankerPrac4.png', 'FlankerPrac5.png', 'FlankerPrac6.png']
     
     # Sequence File
-    generatesequence.createflankersequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, style = 1, parameters = [0, 150, 80, 1000, 1500, ['z','m']], variableiti = 50.0, feedback = [80, 0, 1, 1, 1, 1])
-    #generatesequence.createflankersequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, style = 1, parameters = [55, 150, 80, 1000, 1500, ['z','m']], variableiti = 50.0, feedback = [80, 0, 1, 1, 1, 1])
+    #generatesequence.createflankersequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, style = 1, parameters = [0, 150, 80, 1000, 1500, ['z','m']], variableiti = 50.0, feedback = [80, 0, 1, 1, 1, 1])
+    generatesequence.createflankersequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, style = 1, parameters = [55, 150, 80, 1000, 1500, ['z','slash']], variableiti = 50.0, feedback = [80, 0, 1, 1, 1, 1])
     task.sequence = 'randomsequence.csv'
     
     # Filename Prefix and Suffix
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     task.permanentframemask = 'flankerfixation.png'
     
     # Usable keys during task
-    task.participantkeys = ['1', '4', 'enter', 'z', 'm']
+    task.participantkeys = ['1', '4', 'enter', 'z', 'm', 'slash']
     
     # Experiment Flow Settings
     task.delaybeforestart = 3 # Seconds between end of instructions and beginning of task
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     
     # Device Settings
     task.unicorn = 'UN-2019.05.51' # [] if using other system
-    task.unicornchannels = 'FZ, FC1, FC2, C3, CZ, C4, CPZ, PZ, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
+    task.unicornchannels = 'FZ, FC1, FC2, CZ, CPZ, CP3, PZ, CP4, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
     
     # Begin the Task
     task.start()

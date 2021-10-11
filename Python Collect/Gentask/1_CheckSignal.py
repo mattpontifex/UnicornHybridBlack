@@ -8,7 +8,7 @@ if __name__ == "__main__":
     
     task = Viewer()
 
-    task.unicornchannels = 'FZ, FC1, FC2, C3, CZ, C4, CPZ, PZ, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
+    task.unicornchannels = 'FZ, FC1, FC2, CZ, CPZ, CP3, PZ, CP4, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
     task.unicorn = 'UN-2019.05.51' 
     task.updatetime = 220 # make larger if app starts hanging
     task.run()

@@ -15,7 +15,7 @@ if __name__ == "__main__":
     task.instructioncard = ['OddballInstructions.png']
     
     # Sequence File
-    generatesequence.createoddballsequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, parameters = [200, 200, 900, 1100, 'm'])
+    generatesequence.createoddballsequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, parameters = [200, 200, 900, 1100, 'slash'])
     task.sequence = 'randomsequence.csv'
     
     # Filename Prefix and Suffix
@@ -28,7 +28,7 @@ if __name__ == "__main__":
     task.permanentframemask = ''
     
     # Usable keys during task
-    task.participantkeys = ['1', '4', 'enter', 'a', 'l', 'm']
+    task.participantkeys = ['1', '4', 'enter', 'a', 'l', 'm', 'slash']
     
     # Experiment Flow Settings
     task.delaybeforestart = 2 # Seconds between end of instructions and beginning of task
@@ -41,7 +41,7 @@ if __name__ == "__main__":
     
     # Device Settings
     task.unicorn = 'UN-2019.05.51' # [] if using other system
-    task.unicornchannels = 'FZ, FC1, FC2, C3, CZ, C4, CPZ, PZ, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
+    task.unicornchannels = 'FZ, FC1, FC2, CZ, CPZ, CP3, PZ, CP4, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
     
     # Begin the Task
     task.start()
