@@ -13,6 +13,7 @@ import scipy
 from tkinter import Tk     # from tkinter import Tk for Python 3.x
 from tkinter.filedialog import askopenfilename
 import matplotlib.pyplot
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 
 import tkinter 
 import tkinter.ttk 
@@ -45,7 +46,7 @@ def performancereporter(task):
     arrows_in = alongside_spinner_factory(_arrows_right, _arrows_left)
     
     #with alive_bar(total=0, title='..processing...', unknown='arrows_in', spinner='classic', monitor=False, stats=True) as bar:
-    with alive_bar(total=0, title='..Loading and Processing data..', unknown=arrows_in, spinner='classic', monitor=False, stats=True) as bar:
+    with alive_bar(total=0, title='..Processing data..', unknown=arrows_in, spinner='classic', monitor=False, stats=True) as bar:
         _baractive = True
     
         filin = task.outputfile.split('.')[0]
@@ -65,7 +66,13 @@ def performancereporter(task):
         elif filin[0:3] == 'CN2B':
             # flanker task
             [eggchunk, wavechunk, barchunks] = checkcontinousn2backperf(task, showoutput)
-      
+    if _baractive:
+        _baractive = True
+        bar() 
+        _baractive = False
+        
+    with alive_bar(total=0, title='..Loading results..', unknown=arrows_in, spinner='classic', monitor=False, stats=True) as bar:
+        _baractive = True
         if not ((eggchunk == None) and (wavechunk == None) and (barchunks == None)):
             fig = matplotlib.pyplot.figure(figsize=(20, 12))
             eegpipe.reportingwindow(fig, eggs=eggchunk, waveforms=wavechunk, bars=barchunks, fileout=task.outputfile.split('.')[0] + '.png')
@@ -315,7 +322,7 @@ def checkoddballperf(task, show=True):
     Consistency.title = 'Consistency'
     Consistency.labels = ['Target', 'Nontarget']
     Consistency.values = datapull[1]
-    Consistency.scale = [20, 300]
+    Consistency.scale = [10, 80]
     Consistency.biggerisbetter = False
     Consistency.unit = ' ms'
     
@@ -370,15 +377,23 @@ def checkoddballperf(task, show=True):
             EEGdist = eegpipe.simpleepoch(EEG, Window = [-0.100, 1.000], Types = [30, 10030])
             EEGdist = eegpipe.simplebaselinecorrect(EEGdist, Window = [-0.100, 0.0])
             EEGdist = eegpipe.voltagethreshold(EEGdist, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGdist = eegpipe.antiphasedetection(EEGdist, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ'], Template=outsum[eegpipe.closestidx(xtime, 0.200):eegpipe.closestidx(xtime, 0.800)])
-            EEGdist = eegpipe.antiphasedetection(EEGdist, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ'])
+            EEGdist = eegpipe.antiphasedetection(EEGdist, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'C3', 'C4'], Template=outsum[eegpipe.closestidx(xtime, 0.200):eegpipe.closestidx(xtime, 0.800)])
+            EEGdist = eegpipe.antiphasedetection(EEGdist, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'C3', 'C4'])
             EEGdist = eegpipe.voltagethreshold(EEGdist, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGdist = eegpipe.netdeflectiondetection(EEGdist, Threshold=-10, Direction='negative', Window = [0.200, 0.800],Channel=['CZ', 'CPZ', 'PZ'])
-            EEGdist = eegpipe.simplefilter(EEGdist, Design = 'savitzky-golay', Order = 6)
+            EEGdist2 = eegpipe.netdeflectiondetection(EEGdist, Threshold=-10, Direction='negative', Window = [0.200, 0.800],Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'C3', 'C4'])
+            acceptedtrials = len([v for i,v in enumerate(EEGdist2.reject) if v == 0])
+            if acceptedtrials < 10:
+                EEGdist = eegpipe.simplefilter(EEGdist, Design = 'savitzky-golay', Order = 6)
+            else:
+                EEGdist = eegpipe.simplefilter(EEGdist2, Design = 'savitzky-golay', Order = 6)
             # EEGdist = eegpipe.simplezwave(EEGdist, BaselineWindow = [-0.100, 0.000])
-            EEGdist = eegpipe.simpleaverage(EEGdist, Approach = 'Mean')
-            EEGdist = eegpipe.collapsechannels(EEGdist, Channels = ['C3', 'CZ', 'C4', 'CPZ', 'PZ', 'POZ'], NewChannelName='HOTSPOT', Approach='median')
-            EEGdist = eegpipe.simplefilter(EEGdist, Design = 'savitzky-golay', Order = 4)
+            acceptedtrials = len([v for i,v in enumerate(EEGdist.reject) if v == 0])
+            if acceptedtrials > 10:
+                EEGdist = eegpipe.simpleaverage(EEGdist, Approach = 'Mean')
+                EEGdist = eegpipe.collapsechannels(EEGdist, Channels = ['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'C3', 'C4'], NewChannelName='HOTSPOT', Approach='median')
+                EEGdist = eegpipe.simplefilter(EEGdist, Design = 'savitzky-golay', Order = 4)
+            else:
+                EEGdist = None
         except:
             EEGdist = None
             
@@ -434,15 +449,23 @@ def checkoddballperf(task, show=True):
             EEGtarg = eegpipe.simpleepoch(EEG, Window = [-0.100, 1.000], Types = [20, 10020])
             EEGtarg = eegpipe.simplebaselinecorrect(EEGtarg, Window = [-0.100, 0.0])
             EEGtarg = eegpipe.voltagethreshold(EEGtarg, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGtarg = eegpipe.antiphasedetection(EEGtarg, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ'], Template=outsum[eegpipe.closestidx(xtime, 0.200):eegpipe.closestidx(xtime, 0.800)])
-            EEGtarg = eegpipe.antiphasedetection(EEGtarg, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ'])
+            EEGtarg = eegpipe.antiphasedetection(EEGtarg, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'], Template=outsum[eegpipe.closestidx(xtime, 0.200):eegpipe.closestidx(xtime, 0.800)])
+            EEGtarg = eegpipe.antiphasedetection(EEGtarg, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'])
             EEGtarg = eegpipe.voltagethreshold(EEGtarg, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGtarg = eegpipe.netdeflectiondetection(EEGtarg, Threshold=-10, Direction='negative', Window = [0.200, 0.800],Channel=['CZ', 'CPZ', 'PZ'])
-            EEGtarg = eegpipe.simplefilter(EEGtarg, Design = 'savitzky-golay', Order = 6)
+            EEGtarg2 = eegpipe.netdeflectiondetection(EEGtarg, Threshold=-10, Direction='negative', Window = [0.200, 0.800],Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'])
+            acceptedtrials = len([v for i,v in enumerate(EEGtarg2.reject) if v == 0])
+            if acceptedtrials < 10:
+                EEGtarg = eegpipe.simplefilter(EEGtarg, Design = 'savitzky-golay', Order = 6)
+            else:
+                EEGtarg = eegpipe.simplefilter(EEGtarg2, Design = 'savitzky-golay', Order = 6)
             #EEGtarg = eegpipe.simplezwave(EEGtarg, BaselineWindow = [-0.100, 0.000])
-            EEGtarg = eegpipe.simpleaverage(EEGtarg, Approach = 'Mean')
-            EEGtarg = eegpipe.collapsechannels(EEGtarg, Channels = ['C3', 'CZ', 'C4', 'CPZ', 'PZ', 'POZ'], NewChannelName='HOTSPOT', Approach='median')
-            EEGtarg = eegpipe.simplefilter(EEGtarg, Design = 'savitzky-golay', Order = 4)
+            acceptedtrials = len([v for i,v in enumerate(EEGtarg.reject) if v == 0])
+            if acceptedtrials > 10:
+                EEGtarg = eegpipe.simpleaverage(EEGtarg, Approach = 'Mean')
+                EEGtarg = eegpipe.collapsechannels(EEGtarg, Channels = ['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'], NewChannelName='HOTSPOT', Approach='median')
+                EEGtarg = eegpipe.simplefilter(EEGtarg, Design = 'savitzky-golay', Order = 4)
+            else:
+                EEGtarg = None
         except:
             EEGtarg = None
         
@@ -455,7 +478,7 @@ def checkoddballperf(task, show=True):
             Attention.title = 'Attention'
             Attention.labels = ['Target']
             Attention.values = [outputamplitude[outputchannels.index('HOTSPOT')]]
-            Attention.scale = [0, 20]
+            Attention.scale = [0, 16]
             Attention.biggerisbetter = True
             Attention.unit = ' microV'
             barchunks.append(Attention)
@@ -566,7 +589,7 @@ def checkflankerperf(task, show=True):
     Consistency.title = 'Consistency'
     Consistency.labels = ['All']
     Consistency.values = [datapull[1][0]]
-    Consistency.scale = [20, 300]
+    Consistency.scale = [10, 80]
     Consistency.biggerisbetter = False
     Consistency.unit = ' ms'
     
@@ -614,15 +637,23 @@ def checkflankerperf(task, show=True):
             EEGstim = eegpipe.simpleepoch(EEG, Window = [-0.500, 1.000], Types = stimcodes)
             EEGstim = eegpipe.simplebaselinecorrect(EEGstim, Window = [-0.100, 0.0])
             EEGstim = eegpipe.voltagethreshold(EEGstim, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGstim = eegpipe.antiphasedetection(EEGstim, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ'], Template=outsum[eegpipe.closestidx(xtime, 0.200):eegpipe.closestidx(xtime, 0.800)])
-            EEGstim = eegpipe.antiphasedetection(EEGstim, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ'])
+            EEGstim = eegpipe.antiphasedetection(EEGstim, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'], Template=outsum[eegpipe.closestidx(xtime, 0.200):eegpipe.closestidx(xtime, 0.800)])
+            EEGstim = eegpipe.antiphasedetection(EEGstim, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'])
             EEGstim = eegpipe.voltagethreshold(EEGstim, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGstim = eegpipe.netdeflectiondetection(EEGstim, Threshold=-10, Direction='negative', Window = [0.200, 0.800],Channel=['CZ', 'CPZ', 'PZ'])
-            EEGstim = eegpipe.simplefilter(EEGstim, Design = 'savitzky-golay', Order = 6)
+            EEGstim2 = eegpipe.netdeflectiondetection(EEGstim, Threshold=-10, Direction='negative', Window = [0.200, 0.800],Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'])
+            acceptedtrials = len([v for i,v in enumerate(EEGstim2.reject) if v == 0])
+            if acceptedtrials < 10:
+                EEGstim = eegpipe.simplefilter(EEGstim, Design = 'savitzky-golay', Order = 6)
+            else:
+                EEGstim = eegpipe.simplefilter(EEGstim2, Design = 'savitzky-golay', Order = 6)
             # EEGstim = eegpipe.simplezwave(EEGdist, BaselineWindow = [-0.100, 0.000])
-            EEGstim = eegpipe.simpleaverage(EEGstim, Approach = 'Mean')
-            EEGstim = eegpipe.collapsechannels(EEGstim, Channels = ['C3', 'CZ', 'C4', 'CPZ', 'PZ', 'POZ'], NewChannelName='HOTSPOT', Approach='median')
-            EEGstim = eegpipe.simplefilter(EEGstim, Design = 'savitzky-golay', Order = 4)
+            acceptedtrials = len([v for i,v in enumerate(EEGstim.reject) if v == 0])
+            if acceptedtrials > 10:
+                EEGstim = eegpipe.simpleaverage(EEGstim, Approach = 'Mean')
+                EEGstim = eegpipe.collapsechannels(EEGstim, Channels = ['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'], NewChannelName='HOTSPOT', Approach='median')
+                EEGstim = eegpipe.simplefilter(EEGstim, Design = 'savitzky-golay', Order = 4)
+            else:
+                EEGstim = None
         except:
             EEGstim = None
             
@@ -635,7 +666,7 @@ def checkflankerperf(task, show=True):
             Attention.title = 'Attention'
             Attention.labels = ['Target']
             Attention.values = [outputamplitude[outputchannels.index('HOTSPOT')]]
-            Attention.scale = [0, 20]
+            Attention.scale = [0, 16]
             Attention.biggerisbetter = True
             Attention.unit = ' microV'
             barchunks.append(Attention)
@@ -715,13 +746,21 @@ def checkflankerperf(task, show=True):
             EEGresp = eegpipe.voltagethreshold(EEGresp, Threshold = [-100.0, 100.0], Step = 50.0)
             EEGresp = eegpipe.antiphasedetection(EEGresp, Threshold=0.0, Window = [-0.250, 0.200], Channel=['FZ', 'FC1', 'FC2', 'CZ'], Template=outsum[eegpipe.closestidx(xtime, -0.250):eegpipe.closestidx(xtime, 0.200)])
             EEGresp = eegpipe.antiphasedetection(EEGresp, Threshold=0.0, Window = [-0.250, 0.200], Channel=['FZ', 'FC1', 'FC2', 'CZ'])
-            EEGresp = eegpipe.netdeflectiondetection(EEGresp, Threshold=10, Direction='positive', Window = [-0.250, 0.200],Channel=['FZ', 'FC1', 'FC2', 'CZ'])
-            EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 6)
+            EEGresp2 = eegpipe.netdeflectiondetection(EEGresp, Threshold=10, Direction='positive', Window = [-0.250, 0.200],Channel=['FZ', 'FC1', 'FC2', 'CZ'])
+            acceptedtrials = len([v for i,v in enumerate(EEGresp2.reject) if v == 0])
+            if acceptedtrials < 4:
+                EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 6)
+            else:
+                EEGresp = eegpipe.simplefilter(EEGresp2, Design = 'savitzky-golay', Order = 6)
             EEGresp = eegpipe.simplebaselinecorrect(EEGresp, Window = [-0.500, -0.200])
             #EEGresp = eegpipe.simplezwave(EEGresp, BaselineWindow = [-0.100, 0.000])
-            EEGresp = eegpipe.simpleaverage(EEGresp, Approach = 'Mean')
-            EEGresp = eegpipe.collapsechannels(EEGresp, Channels = ['FZ', 'FC1', 'FC2', 'CZ'], NewChannelName='HOTSPOT', Approach='median')
-            EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 4)
+            acceptedtrials = len([v for i,v in enumerate(EEGresp.reject) if v == 0])
+            if acceptedtrials > 4:
+                EEGresp = eegpipe.simpleaverage(EEGresp, Approach = 'Mean')
+                EEGresp = eegpipe.collapsechannels(EEGresp, Channels = ['FZ', 'FC1', 'FC2', 'CZ'], NewChannelName='HOTSPOT', Approach='median')
+                EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 4)
+            else:
+                EEGresp = None
         except:
             EEGresp = None
         
@@ -742,8 +781,8 @@ def checkflankerperf(task, show=True):
             # snag waveform
             errorwave = eegpipe.waveformplotprep()
             errorwave.title = 'Monitoring'
-            errorwave.x = EEGresp.times[eegpipe.closestidx(EEGresp.times, -0.300):eegpipe.closestidx(EEGresp.times, 0.300)]
-            errorwave.y = EEGresp.data[outputchannels.index('HOTSPOT')][eegpipe.closestidx(EEGresp.times, -0.300):eegpipe.closestidx(EEGresp.times, 0.300)]
+            errorwave.x = EEGresp.times[eegpipe.closestidx(EEGresp.times, -0.300):eegpipe.closestidx(EEGresp.times, 0.200)]
+            errorwave.y = EEGresp.data[outputchannels.index('HOTSPOT')][eegpipe.closestidx(EEGresp.times, -0.300):eegpipe.closestidx(EEGresp.times, 0.200)]
             errorwave.linestyle='solid'
             errorwave.linecolor= '#EF9A35'
             errorwave.lineweight=2
@@ -757,8 +796,8 @@ def checkflankerperf(task, show=True):
                 
             ErrReference = eegpipe.waveformplotprep()
             ErrReference.title = 'Monitoring Reference'
-            ErrReference.x = xtime[eegpipe.closestidx(xtime, -0.300):eegpipe.closestidx(xtime, 0.300)]
-            ErrReference.y = numpy.multiply(outsum,8)[eegpipe.closestidx(xtime, -0.300):eegpipe.closestidx(xtime, 0.300)]
+            ErrReference.x = xtime[eegpipe.closestidx(xtime, -0.300):eegpipe.closestidx(xtime, 0.200)]
+            ErrReference.y = numpy.multiply(outsum,8)[eegpipe.closestidx(xtime, -0.300):eegpipe.closestidx(xtime, 0.200)]
             ErrReference.linestyle='dashed'
             ErrReference.linecolor= '#999999'
             ErrReference.lineweight=0.5
@@ -767,13 +806,17 @@ def checkflankerperf(task, show=True):
             else: 
                 wavechunk.append(ErrReference)
             
+        
+            segs = ['#F593FA', '#9F71E3', '#7729F0', '#350C8F','#23248F', '#1C2C75', '#00004B'] 
+            newcmap = LinearSegmentedColormap.from_list("", segs, 256) 
+            
             # snag egghead
             #outputamplitude = eegpipe.extractamplitude(EEGdist, Window=[0.300, 0.600], Approach='mean')
             erroregg = eegpipe.eggheadplotprep()
             erroregg.title = 'Monitoring'
             erroregg.channels = outputchannels
             erroregg.amplitudes = outputamplitude 
-            erroregg.colormap = matplotlib.pyplot.cm.cool
+            erroregg.colormap = newcmap
             erroregg.scale = [0, 1]
             if outputamplitude[outputchannels.index('HOTSPOT')] < erroregg.scale[0]:
                 erroregg.scale[0] = outputamplitude[outputchannels.index('HOTSPOT')]
@@ -827,7 +870,7 @@ def checkn2backperf(task, show=True):
     Consistency.title = 'Consistency'
     Consistency.labels = ['All']
     Consistency.values = [datapull[1][0]]
-    Consistency.scale = [20, 300]
+    Consistency.scale = [10, 80]
     Consistency.biggerisbetter = False
     Consistency.unit = ' ms'
     
@@ -893,15 +936,23 @@ def checkn2backperf(task, show=True):
             EEGtarg = eegpipe.simpleepoch(EEG, Window = [-0.100, 1.000], Types = targtrials)
             EEGtarg = eegpipe.simplebaselinecorrect(EEGtarg, Window = [-0.100, 0.0])
             EEGtarg = eegpipe.voltagethreshold(EEGtarg, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGtarg = eegpipe.antiphasedetection(EEGtarg, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ'], Template=outsum[eegpipe.closestidx(xtime, 0.200):eegpipe.closestidx(xtime, 0.800)])
-            EEGtarg = eegpipe.antiphasedetection(EEGtarg, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ'])
+            EEGtarg = eegpipe.antiphasedetection(EEGtarg, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'], Template=outsum[eegpipe.closestidx(xtime, 0.200):eegpipe.closestidx(xtime, 0.800)])
+            EEGtarg = eegpipe.antiphasedetection(EEGtarg, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'])
             EEGtarg = eegpipe.voltagethreshold(EEGtarg, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGtarg = eegpipe.netdeflectiondetection(EEGtarg, Threshold=-10, Direction='negative', Window = [0.200, 0.800],Channel=['CZ', 'CPZ', 'PZ'])
-            EEGtarg = eegpipe.simplefilter(EEGtarg, Design = 'savitzky-golay', Order = 6)
+            EEGtarg2 = eegpipe.netdeflectiondetection(EEGtarg, Threshold=-10, Direction='negative', Window = [0.200, 0.800],Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'])
+            acceptedtrials = len([v for i,v in enumerate(EEGtarg2.reject) if v == 0])
+            if acceptedtrials < 10:
+                EEGtarg = eegpipe.simplefilter(EEGtarg, Design = 'savitzky-golay', Order = 6)
+            else:
+                EEGtarg = eegpipe.simplefilter(EEGtarg2, Design = 'savitzky-golay', Order = 6)
             #EEGtarg = eegpipe.simplezwave(EEGtarg, BaselineWindow = [-0.100, 0.000])
-            EEGtarg = eegpipe.simpleaverage(EEGtarg, Approach = 'Mean')
-            EEGtarg = eegpipe.collapsechannels(EEGtarg, Channels = ['C3', 'CZ', 'C4', 'CPZ', 'PZ', 'POZ'], NewChannelName='HOTSPOT', Approach='median')
-            EEGtarg = eegpipe.simplefilter(EEGtarg, Design = 'savitzky-golay', Order = 4)
+            acceptedtrials = len([v for i,v in enumerate(EEGtarg.reject) if v == 0])
+            if acceptedtrials > 10:
+                EEGtarg = eegpipe.simpleaverage(EEGtarg, Approach = 'Mean')
+                EEGtarg = eegpipe.collapsechannels(EEGtarg, Channels = ['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'], NewChannelName='HOTSPOT', Approach='median')
+                EEGtarg = eegpipe.simplefilter(EEGtarg, Design = 'savitzky-golay', Order = 4)
+            else:
+                EEGtarg = None
         except:
             EEGtarg = None
         
@@ -914,7 +965,7 @@ def checkn2backperf(task, show=True):
             Attention.title = 'Attention'
             Attention.labels = ['Target']
             Attention.values = [outputamplitude[outputchannels.index('HOTSPOT')]]
-            Attention.scale = [0, 20]
+            Attention.scale = [0, 16]
             Attention.biggerisbetter = True
             Attention.unit = ' microV'
             barchunks.append(Attention)
@@ -990,13 +1041,21 @@ def checkn2backperf(task, show=True):
             EEGresp = eegpipe.voltagethreshold(EEGresp, Threshold = [-100.0, 100.0], Step = 50.0)
             EEGresp = eegpipe.antiphasedetection(EEGresp, Threshold=0.0, Window = [-0.150, 0.300], Channel=['FZ', 'FC1', 'FC2', 'CZ'], Template=outsum[eegpipe.closestidx(xtime, -0.150):eegpipe.closestidx(xtime, 0.300)])
             EEGresp = eegpipe.antiphasedetection(EEGresp, Threshold=0.1, Window = [-0.150, 0.300], Channel=['FZ', 'FC1', 'FC2', 'CZ'])
-            EEGresp = eegpipe.netdeflectiondetection(EEGresp, Threshold=10, Direction='positive', Window = [-0.150, 0.300],Channel=['FZ', 'FC1', 'FC2', 'CZ'])
-            EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 6)
+            EEGresp2 = eegpipe.netdeflectiondetection(EEGresp, Threshold=10, Direction='positive', Window = [-0.150, 0.300],Channel=['FZ', 'FC1', 'FC2', 'CZ'])
+            acceptedtrials = len([v for i,v in enumerate(EEGresp2.reject) if v == 0])
+            if acceptedtrials < 4:
+                EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 6)
+            else:
+                EEGresp = eegpipe.simplefilter(EEGresp2, Design = 'savitzky-golay', Order = 6)
             EEGresp = eegpipe.simplebaselinecorrect(EEGresp, Window = [-0.500, -0.200])
             #EEGresp = eegpipe.simplezwave(EEGresp, BaselineWindow = [-0.100, 0.000])
-            EEGresp = eegpipe.simpleaverage(EEGresp, Approach = 'Mean')
-            EEGresp = eegpipe.collapsechannels(EEGresp, Channels = ['FZ', 'FC1', 'FC2', 'CZ'], NewChannelName='HOTSPOT', Approach='median')
-            EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 4)
+            acceptedtrials = len([v for i,v in enumerate(EEGresp.reject) if v == 0])
+            if acceptedtrials > 4:
+                EEGresp = eegpipe.simpleaverage(EEGresp, Approach = 'Mean')
+                EEGresp = eegpipe.collapsechannels(EEGresp, Channels = ['FZ', 'FC1', 'FC2', 'CZ'], NewChannelName='HOTSPOT', Approach='median')
+                EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 4)
+            else:
+                EEGresp = None
         except:
             EEGresp = None
         
@@ -1042,13 +1101,15 @@ def checkn2backperf(task, show=True):
             else: 
                 wavechunk.append(ErrReference)
             
+            segs = ['#F593FA', '#9F71E3', '#7729F0', '#350C8F','#23248F', '#1C2C75', '#00004B'] 
+            newcmap = LinearSegmentedColormap.from_list("", segs, 256)
             # snag egghead
             #outputamplitude = eegpipe.extractamplitude(EEGdist, Window=[0.300, 0.600], Approach='mean')
             erroregg = eegpipe.eggheadplotprep()
             erroregg.title = 'Monitoring'
             erroregg.channels = outputchannels
             erroregg.amplitudes = outputamplitude 
-            erroregg.colormap = matplotlib.pyplot.cm.cool
+            erroregg.colormap = newcmap
             erroregg.scale = [0, 1]
             if outputamplitude[outputchannels.index('HOTSPOT')] < erroregg.scale[0]:
                 erroregg.scale[0] = outputamplitude[outputchannels.index('HOTSPOT')]
@@ -1094,7 +1155,7 @@ def checkcontinousn2backperf(task, show=True):
     Consistency.title = 'Consistency'
     Consistency.labels = ['Consistency']
     Consistency.values = datapull[1]
-    Consistency.scale = [20, 300]
+    Consistency.scale = [10, 80]
     Consistency.biggerisbetter = False
     Consistency.unit = ' ms'
     
@@ -1138,13 +1199,21 @@ def checkcontinousn2backperf(task, show=True):
             EEGresp = eegpipe.voltagethreshold(EEGresp, Threshold = [-100.0, 100.0], Step = 50.0)
             EEGresp = eegpipe.antiphasedetection(EEGresp, Threshold=0.0, Window = [-0.150, 0.300], Channel=['FZ', 'FC1', 'FC2', 'CZ'], Template=outsum[eegpipe.closestidx(xtime, -0.150):eegpipe.closestidx(xtime, 0.300)])
             EEGresp = eegpipe.antiphasedetection(EEGresp, Threshold=0.1, Window = [-0.150, 0.300], Channel=['FZ', 'FC1', 'FC2', 'CZ'])
-            EEGresp = eegpipe.netdeflectiondetection(EEGresp, Threshold=10, Direction='positive', Window = [-0.150, 0.300],Channel=['FZ', 'FC1', 'FC2', 'CZ'])
-            EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 6)
+            EEGresp2 = eegpipe.netdeflectiondetection(EEGresp, Threshold=10, Direction='positive', Window = [-0.150, 0.300],Channel=['FZ', 'FC1', 'FC2', 'CZ'])
+            acceptedtrials = len([v for i,v in enumerate(EEGresp2.reject) if v == 0])
+            if acceptedtrials < 4:
+                EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 6)
+            else:
+                EEGresp = eegpipe.simplefilter(EEGresp2, Design = 'savitzky-golay', Order = 6)
             EEGresp = eegpipe.simplebaselinecorrect(EEGresp, Window = [-0.500, -0.200])
             #EEGresp = eegpipe.simplezwave(EEGresp, BaselineWindow = [-0.100, 0.000])
-            EEGresp = eegpipe.simpleaverage(EEGresp, Approach = 'Mean')
-            EEGresp = eegpipe.collapsechannels(EEGresp, Channels = ['FZ', 'FC1', 'FC2', 'CZ'], NewChannelName='HOTSPOT', Approach='median')
-            EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 4)
+            acceptedtrials = len([v for i,v in enumerate(EEGresp.reject) if v == 0])
+            if acceptedtrials > 4:
+                EEGresp = eegpipe.simpleaverage(EEGresp, Approach = 'Mean')
+                EEGresp = eegpipe.collapsechannels(EEGresp, Channels = ['FZ', 'FC1', 'FC2', 'CZ'], NewChannelName='HOTSPOT', Approach='median')
+                EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 4)
+            else:
+                EEGresp = None
         except:
             EEGresp = None
         
@@ -1190,13 +1259,16 @@ def checkcontinousn2backperf(task, show=True):
             else: 
                 wavechunk.append(ErrReference)
             
+            segs = ['#F593FA', '#9F71E3', '#7729F0', '#350C8F','#23248F', '#1C2C75', '#00004B'] 
+            newcmap = LinearSegmentedColormap.from_list("", segs, 256)
+            
             # snag egghead
             #outputamplitude = eegpipe.extractamplitude(EEGdist, Window=[0.300, 0.600], Approach='mean')
             erroregg = eegpipe.eggheadplotprep()
             erroregg.title = 'Monitoring'
             erroregg.channels = outputchannels
             erroregg.amplitudes = outputamplitude 
-            erroregg.colormap = matplotlib.pyplot.cm.cool
+            erroregg.colormap = newcmap
             erroregg.scale = [0, 1]
             if outputamplitude[outputchannels.index('HOTSPOT')] < erroregg.scale[0]:
                 erroregg.scale[0] = outputamplitude[outputchannels.index('HOTSPOT')]

@@ -1465,8 +1465,10 @@ def extractpeaks(EEG, Window=False, Points=False, Direction=False, Surround=Fals
                     searchdata = EEG.data[cC][cE][startindex:stopindex]                    
                     if Direction == 'min':
                         searchdata = numpy.multiply(searchdata, -1)
-                            
-                    outpoint = peakutils.indexes(searchdata, thres=float(maxthresh), min_dist=int(Points))
+                    try:        
+                        outpoint = peakutils.indexes(searchdata, thres=float(maxthresh), min_dist=int(Points))
+                    except:
+                        outpoint = []
                     if len(outpoint) == 0:
                         maxthresh = numpy.subtract(maxthresh, 0.01)
                         if (maxthresh < 0.5):
@@ -1498,8 +1500,10 @@ def extractpeaks(EEG, Window=False, Points=False, Direction=False, Surround=Fals
                 searchdata = EEG.data[cC][startindex:stopindex]                    
                 if Direction == 'min':
                     searchdata = numpy.multiply(searchdata, -1)
-
-                outpoint = peakutils.indexes(searchdata, thres=float(maxthresh), min_dist=int(Points))
+                try:
+                    outpoint = peakutils.indexes(searchdata, thres=float(maxthresh), min_dist=int(Points))
+                except:
+                    outpoint = []
                 if len(outpoint) == 0:
                     maxthresh = numpy.subtract(maxthresh, 0.01)
                     if (maxthresh < 0.5):
@@ -2213,6 +2217,7 @@ def voltagethreshold(EEG, Threshold=False, Step=False, NaN=True):
                         OUTEEG.reject[cE] = 4
                         
 
+    OUTEEG.acceptedtrials = len([v for i,v in enumerate(OUTEEG.reject) if v == 0])
     return OUTEEG
 
 def simplezwave(EEG, BaselineWindow=False, ddof=1):
