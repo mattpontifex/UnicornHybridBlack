@@ -15,7 +15,7 @@ if __name__ == "__main__":
     task.instructioncard = ['OddballInstructions.png']
     
     # Sequence File
-    generatesequence.createoddballsequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, parameters = [200, 200, 900, 1100, 'slash'])
+    generatesequence.createoddballsequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, parameters = [200, 200, 900, 1100, 'j'])
     task.sequence = 'randomsequence.csv'
     
     # Filename Prefix and Suffix
@@ -28,7 +28,7 @@ if __name__ == "__main__":
     task.permanentframemask = ''
     
     # Usable keys during task
-    task.participantkeys = ['1', '4', 'enter', 'a', 'l', 'm', 'slash']
+    task.participantkeys = ['1', '4', 'enter', 'a', 'l', 'm', 'slash', 'f', 'j']
     
     # Experiment Flow Settings
     task.delaybeforestart = 2 # Seconds between end of instructions and beginning of task

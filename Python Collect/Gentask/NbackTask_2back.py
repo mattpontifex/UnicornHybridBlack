@@ -15,7 +15,7 @@ if __name__ == "__main__":
     task.instructioncard = ['SNBp1.png', 'SNBp2.png', 'SNBp3.png', 'SNBp4.png', 'SNBp5.png', 'SNBp6.png', 'SNBp7.png']
     
     # Sequence File
-    generatesequence.createnbacksequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, style = 1, back = 2, parameters = [500, 100, 2450, 2500, ['z','m']], feedback = [80, 0, 1, 1, 1, 1])
+    generatesequence.createnbacksequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, style = 1, back = 2, parameters = [500, 100, 2450, 2500, ['f', 'j']], feedback = [80, 0, 1, 1, 1, 1])
     task.sequence = 'randomsequence.csv'
     
     # Filename Prefix and Suffix
@@ -28,7 +28,7 @@ if __name__ == "__main__":
     task.permanentframemask = 'SNB6grid.png'
     
     # Usable keys during task
-    task.participantkeys = ['1', '4', 'enter', 'z', 'm']
+    task.participantkeys = ['1', '4', 'enter', 'z', 'm', 'slash', 'f', 'j']
     
     # Experiment Flow Settings
     task.delaybeforestart = 3 # Seconds between end of instructions and beginning of task

@@ -16,7 +16,7 @@ if __name__ == "__main__":
     
     # Sequence File
     #generatesequence.createflankersequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, style = 1, parameters = [0, 150, 80, 1000, 1500, ['z','m']], variableiti = 50.0, feedback = [80, 0, 1, 1, 1, 1])
-    generatesequence.createflankersequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, style = 1, parameters = [55, 150, 80, 1000, 1500, ['z','slash']], variableiti = 50.0, feedback = [80, 0, 1, 1, 1, 1])
+    generatesequence.createflankersequence(filout = task.folders.sequencefolder + os.path.sep + 'randomsequence.csv', cycles = 1, style = 1, parameters = [55, 150, 80, 1000, 1500, ['f','j']], variableiti = 50.0, feedback = [80, 0, 1, 1, 1, 1])
     task.sequence = 'randomsequence.csv'
     
     # Filename Prefix and Suffix
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     task.permanentframemask = 'flankerfixation.png'
     
     # Usable keys during task
-    task.participantkeys = ['1', '4', 'enter', 'z', 'm', 'slash']
+    task.participantkeys = ['1', '4', 'enter', 'z', 'm', 'slash', 'f', 'j']
     
     # Experiment Flow Settings
     task.delaybeforestart = 3 # Seconds between end of instructions and beginning of task
