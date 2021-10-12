@@ -36,12 +36,12 @@ if __name__ == "__main__":
     # Modify Screen Settings for Participant
     task.participantmonitor.displaynumber = 0 # Monitor Number
     task.participantmonitor.resolution = (1920, 1080)
-    task.participantmonitor.backgroundcolor = '#787878' # RGB Codes (-1 to 1) or Hex Code
+    task.participantmonitor.backgroundcolor = '#595959' # RGB Codes (-1 to 1) or Hex Code
     task.participantmonitor.forgroundcolor = '#FFFFFF' # RGB Codes (-1 to 1) or Hex Code
     
     # Device Settings
     task.unicorn = 'UN-2019.05.51' # [] if using other system
-    task.unicornchannels = 'FZ, FC1, FC2, C3, CZ, C4, CPZ, PZ, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
+    task.unicornchannels = 'FZ, FC1, FC2, CP3, CPZ, CP4, PZ, POZ, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
     
     # Begin the Task
     task.start()
