@@ -376,19 +376,8 @@ def checkoddballperf(task, show=True):
         try:
             EEGdist = eegpipe.simpleepoch(EEG, Window = [-0.100, 1.000], Types = [30, 10030])
             EEGdist = eegpipe.simplebaselinecorrect(EEGdist, Window = [-0.100, 0.0])
-            EEGdist = eegpipe.voltagethreshold(EEGdist, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGdist = eegpipe.antiphasedetection(EEGdist, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'C3', 'C4'], Template=outsum[eegpipe.closestidx(xtime, 0.200):eegpipe.closestidx(xtime, 0.800)])
-            EEGdist = eegpipe.antiphasedetection(EEGdist, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'C3', 'C4'])
-            EEGdist = eegpipe.voltagethreshold(EEGdist, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGdist2 = eegpipe.netdeflectiondetection(EEGdist, Threshold=-10, Direction='negative', Window = [0.200, 0.800],Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'C3', 'C4'])
-            acceptedtrials = len([v for i,v in enumerate(EEGdist2.reject) if v == 0])
-            if acceptedtrials < 10:
-                EEGdist = eegpipe.simplefilter(EEGdist, Design = 'savitzky-golay', Order = 6)
-            else:
-                EEGdist = eegpipe.simplefilter(EEGdist2, Design = 'savitzky-golay', Order = 6)
-            # EEGdist = eegpipe.simplezwave(EEGdist, BaselineWindow = [-0.100, 0.000])
-            acceptedtrials = len([v for i,v in enumerate(EEGdist.reject) if v == 0])
-            if acceptedtrials > 10:
+            EEGdist = eegpipe.pthreepipe(EEGdist)
+            if EEGdist.acceptedtrials > 5:
                 EEGdist = eegpipe.simpleaverage(EEGdist, Approach = 'Mean')
                 EEGdist = eegpipe.collapsechannels(EEGdist, Channels = ['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'C3', 'C4'], NewChannelName='HOTSPOT', Approach='median')
                 EEGdist = eegpipe.simplefilter(EEGdist, Design = 'savitzky-golay', Order = 4)
@@ -448,19 +437,8 @@ def checkoddballperf(task, show=True):
         try:
             EEGtarg = eegpipe.simpleepoch(EEG, Window = [-0.100, 1.000], Types = [20, 10020])
             EEGtarg = eegpipe.simplebaselinecorrect(EEGtarg, Window = [-0.100, 0.0])
-            EEGtarg = eegpipe.voltagethreshold(EEGtarg, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGtarg = eegpipe.antiphasedetection(EEGtarg, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'], Template=outsum[eegpipe.closestidx(xtime, 0.200):eegpipe.closestidx(xtime, 0.800)])
-            EEGtarg = eegpipe.antiphasedetection(EEGtarg, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'])
-            EEGtarg = eegpipe.voltagethreshold(EEGtarg, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGtarg2 = eegpipe.netdeflectiondetection(EEGtarg, Threshold=-10, Direction='negative', Window = [0.200, 0.800],Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'])
-            acceptedtrials = len([v for i,v in enumerate(EEGtarg2.reject) if v == 0])
-            if acceptedtrials < 10:
-                EEGtarg = eegpipe.simplefilter(EEGtarg, Design = 'savitzky-golay', Order = 6)
-            else:
-                EEGtarg = eegpipe.simplefilter(EEGtarg2, Design = 'savitzky-golay', Order = 6)
-            #EEGtarg = eegpipe.simplezwave(EEGtarg, BaselineWindow = [-0.100, 0.000])
-            acceptedtrials = len([v for i,v in enumerate(EEGtarg.reject) if v == 0])
-            if acceptedtrials > 10:
+            EEGtarg = eegpipe.pthreepipe(EEGtarg)
+            if EEGtarg.acceptedtrials > 5:
                 EEGtarg = eegpipe.simpleaverage(EEGtarg, Approach = 'Mean')
                 EEGtarg = eegpipe.collapsechannels(EEGtarg, Channels = ['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'], NewChannelName='HOTSPOT', Approach='median')
                 EEGtarg = eegpipe.simplefilter(EEGtarg, Design = 'savitzky-golay', Order = 4)
@@ -636,19 +614,8 @@ def checkflankerperf(task, show=True):
         try:
             EEGstim = eegpipe.simpleepoch(EEG, Window = [-0.500, 1.000], Types = stimcodes)
             EEGstim = eegpipe.simplebaselinecorrect(EEGstim, Window = [-0.100, 0.0])
-            EEGstim = eegpipe.voltagethreshold(EEGstim, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGstim = eegpipe.antiphasedetection(EEGstim, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'], Template=outsum[eegpipe.closestidx(xtime, 0.200):eegpipe.closestidx(xtime, 0.800)])
-            EEGstim = eegpipe.antiphasedetection(EEGstim, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'])
-            EEGstim = eegpipe.voltagethreshold(EEGstim, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGstim2 = eegpipe.netdeflectiondetection(EEGstim, Threshold=-10, Direction='negative', Window = [0.200, 0.800],Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'])
-            acceptedtrials = len([v for i,v in enumerate(EEGstim2.reject) if v == 0])
-            if acceptedtrials < 10:
-                EEGstim = eegpipe.simplefilter(EEGstim, Design = 'savitzky-golay', Order = 6)
-            else:
-                EEGstim = eegpipe.simplefilter(EEGstim2, Design = 'savitzky-golay', Order = 6)
-            # EEGstim = eegpipe.simplezwave(EEGdist, BaselineWindow = [-0.100, 0.000])
-            acceptedtrials = len([v for i,v in enumerate(EEGstim.reject) if v == 0])
-            if acceptedtrials > 10:
+            EEGstim = eegpipe.pthreepipe(EEGstim)
+            if EEGstim.acceptedtrials > 5:
                 EEGstim = eegpipe.simpleaverage(EEGstim, Approach = 'Mean')
                 EEGstim = eegpipe.collapsechannels(EEGstim, Channels = ['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'], NewChannelName='HOTSPOT', Approach='median')
                 EEGstim = eegpipe.simplefilter(EEGstim, Design = 'savitzky-golay', Order = 4)
@@ -743,19 +710,8 @@ def checkflankerperf(task, show=True):
         try:
             EEGresp = eegpipe.simpleepoch(EEG, Window = [-0.500, 1.000], Types = [51, 10051])
             EEGresp = eegpipe.simplebaselinecorrect(EEGresp, Window = [-0.500, -0.200])
-            EEGresp = eegpipe.voltagethreshold(EEGresp, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGresp = eegpipe.antiphasedetection(EEGresp, Threshold=0.0, Window = [-0.250, 0.200], Channel=['FZ', 'FC1', 'FC2', 'CZ'], Template=outsum[eegpipe.closestidx(xtime, -0.250):eegpipe.closestidx(xtime, 0.200)])
-            EEGresp = eegpipe.antiphasedetection(EEGresp, Threshold=0.0, Window = [-0.250, 0.200], Channel=['FZ', 'FC1', 'FC2', 'CZ'])
-            EEGresp2 = eegpipe.netdeflectiondetection(EEGresp, Threshold=10, Direction='positive', Window = [-0.250, 0.200],Channel=['FZ', 'FC1', 'FC2', 'CZ'])
-            acceptedtrials = len([v for i,v in enumerate(EEGresp2.reject) if v == 0])
-            if acceptedtrials < 4:
-                EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 6)
-            else:
-                EEGresp = eegpipe.simplefilter(EEGresp2, Design = 'savitzky-golay', Order = 6)
-            EEGresp = eegpipe.simplebaselinecorrect(EEGresp, Window = [-0.500, -0.200])
-            #EEGresp = eegpipe.simplezwave(EEGresp, BaselineWindow = [-0.100, 0.000])
-            acceptedtrials = len([v for i,v in enumerate(EEGresp.reject) if v == 0])
-            if acceptedtrials > 4:
+            EEGresp = eegpipe.ernpipe(EEGresp)
+            if EEGresp.acceptedtrials > 4:
                 EEGresp = eegpipe.simpleaverage(EEGresp, Approach = 'Mean')
                 EEGresp = eegpipe.collapsechannels(EEGresp, Channels = ['FZ', 'FC1', 'FC2', 'CZ'], NewChannelName='HOTSPOT', Approach='median')
                 EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 4)
@@ -935,19 +891,8 @@ def checkn2backperf(task, show=True):
         try:
             EEGtarg = eegpipe.simpleepoch(EEG, Window = [-0.100, 1.000], Types = targtrials)
             EEGtarg = eegpipe.simplebaselinecorrect(EEGtarg, Window = [-0.100, 0.0])
-            EEGtarg = eegpipe.voltagethreshold(EEGtarg, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGtarg = eegpipe.antiphasedetection(EEGtarg, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'], Template=outsum[eegpipe.closestidx(xtime, 0.200):eegpipe.closestidx(xtime, 0.800)])
-            EEGtarg = eegpipe.antiphasedetection(EEGtarg, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'])
-            EEGtarg = eegpipe.voltagethreshold(EEGtarg, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGtarg2 = eegpipe.netdeflectiondetection(EEGtarg, Threshold=-10, Direction='negative', Window = [0.200, 0.800],Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'])
-            acceptedtrials = len([v for i,v in enumerate(EEGtarg2.reject) if v == 0])
-            if acceptedtrials < 10:
-                EEGtarg = eegpipe.simplefilter(EEGtarg, Design = 'savitzky-golay', Order = 6)
-            else:
-                EEGtarg = eegpipe.simplefilter(EEGtarg2, Design = 'savitzky-golay', Order = 6)
-            #EEGtarg = eegpipe.simplezwave(EEGtarg, BaselineWindow = [-0.100, 0.000])
-            acceptedtrials = len([v for i,v in enumerate(EEGtarg.reject) if v == 0])
-            if acceptedtrials > 10:
+            EEGtarg = eegpipe.pthreepipe(EEGtarg)
+            if EEGtarg.acceptedtrials > 5:
                 EEGtarg = eegpipe.simpleaverage(EEGtarg, Approach = 'Mean')
                 EEGtarg = eegpipe.collapsechannels(EEGtarg, Channels = ['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'], NewChannelName='HOTSPOT', Approach='median')
                 EEGtarg = eegpipe.simplefilter(EEGtarg, Design = 'savitzky-golay', Order = 4)
@@ -1038,19 +983,8 @@ def checkn2backperf(task, show=True):
         try:
             EEGresp = eegpipe.simpleepoch(EEG, Window = [-0.500, 1.000], Types = [51, 10051])
             EEGresp = eegpipe.simplebaselinecorrect(EEGresp, Window = [-0.500, -0.200])
-            EEGresp = eegpipe.voltagethreshold(EEGresp, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGresp = eegpipe.antiphasedetection(EEGresp, Threshold=0.0, Window = [-0.150, 0.300], Channel=['FZ', 'FC1', 'FC2', 'CZ'], Template=outsum[eegpipe.closestidx(xtime, -0.150):eegpipe.closestidx(xtime, 0.300)])
-            EEGresp = eegpipe.antiphasedetection(EEGresp, Threshold=0.1, Window = [-0.150, 0.300], Channel=['FZ', 'FC1', 'FC2', 'CZ'])
-            EEGresp2 = eegpipe.netdeflectiondetection(EEGresp, Threshold=10, Direction='positive', Window = [-0.150, 0.300],Channel=['FZ', 'FC1', 'FC2', 'CZ'])
-            acceptedtrials = len([v for i,v in enumerate(EEGresp2.reject) if v == 0])
-            if acceptedtrials < 4:
-                EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 6)
-            else:
-                EEGresp = eegpipe.simplefilter(EEGresp2, Design = 'savitzky-golay', Order = 6)
-            EEGresp = eegpipe.simplebaselinecorrect(EEGresp, Window = [-0.500, -0.200])
-            #EEGresp = eegpipe.simplezwave(EEGresp, BaselineWindow = [-0.100, 0.000])
-            acceptedtrials = len([v for i,v in enumerate(EEGresp.reject) if v == 0])
-            if acceptedtrials > 4:
+            EEGresp = eegpipe.ernpipe(EEGresp)
+            if EEGresp.acceptedtrials > 4:
                 EEGresp = eegpipe.simpleaverage(EEGresp, Approach = 'Mean')
                 EEGresp = eegpipe.collapsechannels(EEGresp, Channels = ['FZ', 'FC1', 'FC2', 'CZ'], NewChannelName='HOTSPOT', Approach='median')
                 EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 4)
@@ -1196,19 +1130,8 @@ def checkcontinousn2backperf(task, show=True):
         try:
             EEGresp = eegpipe.simpleepoch(EEG, Window = [-0.500, 1.000], Types = [51, 10051])
             EEGresp = eegpipe.simplebaselinecorrect(EEGresp, Window = [-0.500, -0.200])
-            EEGresp = eegpipe.voltagethreshold(EEGresp, Threshold = [-100.0, 100.0], Step = 50.0)
-            EEGresp = eegpipe.antiphasedetection(EEGresp, Threshold=0.0, Window = [-0.150, 0.300], Channel=['FZ', 'FC1', 'FC2', 'CZ'], Template=outsum[eegpipe.closestidx(xtime, -0.150):eegpipe.closestidx(xtime, 0.300)])
-            EEGresp = eegpipe.antiphasedetection(EEGresp, Threshold=0.1, Window = [-0.150, 0.300], Channel=['FZ', 'FC1', 'FC2', 'CZ'])
-            EEGresp2 = eegpipe.netdeflectiondetection(EEGresp, Threshold=10, Direction='positive', Window = [-0.150, 0.300],Channel=['FZ', 'FC1', 'FC2', 'CZ'])
-            acceptedtrials = len([v for i,v in enumerate(EEGresp2.reject) if v == 0])
-            if acceptedtrials < 4:
-                EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 6)
-            else:
-                EEGresp = eegpipe.simplefilter(EEGresp2, Design = 'savitzky-golay', Order = 6)
-            EEGresp = eegpipe.simplebaselinecorrect(EEGresp, Window = [-0.500, -0.200])
-            #EEGresp = eegpipe.simplezwave(EEGresp, BaselineWindow = [-0.100, 0.000])
-            acceptedtrials = len([v for i,v in enumerate(EEGresp.reject) if v == 0])
-            if acceptedtrials > 4:
+            EEGresp = eegpipe.ernpipe(EEGresp)
+            if EEGresp.acceptedtrials > 4:
                 EEGresp = eegpipe.simpleaverage(EEGresp, Approach = 'Mean')
                 EEGresp = eegpipe.collapsechannels(EEGresp, Channels = ['FZ', 'FC1', 'FC2', 'CZ'], NewChannelName='HOTSPOT', Approach='median')
                 EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 4)

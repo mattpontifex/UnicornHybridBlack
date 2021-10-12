@@ -531,10 +531,9 @@ class Engine():
                                     self.experimenternotificationtext.setText('Task Resuming.'); self.experimenterwin.flip()
                                 time.sleep(self.delaybeforestart)
                                 
-                                
-                                
-                                
-                                
+                            
+                            self.participantwin.winHandle.maximize() 
+                            self.participantwin.winHandle.activate()     
                                 
                             #####  Prepare for trial #####
                             

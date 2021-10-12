@@ -49,6 +49,13 @@ from peakutils.plot import plot as peakutilspplot
 # %matplotlib inline
 #%matplotlib qt
 
+
+
+
+
+
+
+
 def vectorlength(group1, group2):
     asquare = numpy.square(numpy.absolute(numpy.subtract(group2[0], group1[0])))
     bsquare = numpy.square(numpy.absolute(numpy.subtract(group2[1], group1[1])))
@@ -2096,6 +2103,11 @@ def antiphasedetection(EEG, Threshold=False, Window=False, Approach=False, Chann
     Approach = checkdefaultsettings(Approach, ['median', 'mean'])
     Mode = checkdefaultsettings(Mode, ['both', 'add', 'remove'])
     
+    # see if there is anything to work with
+    acceptedtrials = len([v for i,v in enumerate(EEG.reject) if v == 0])
+    if acceptedtrials == 0:
+        EEG.reject = [0] * len(EEG.reject) # acccept everything and go on
+    
     OUTEEG = copy.deepcopy(EEG)
 
     if OUTEEG.trials > 0:
@@ -2176,48 +2188,59 @@ def antiphasedetection(EEG, Threshold=False, Window=False, Approach=False, Chann
     OUTEEG.acceptedtrials = len([v for i,v in enumerate(OUTEEG.reject) if v == 0])
     return OUTEEG
 
-def voltagethreshold(EEG, Threshold=False, Step=False, NaN=True):
+def voltagethreshold(EEG, Threshold=False, Step=False, NaN=True, Flip=0):
     # function to screen epoched data for voltages or voltage steps that exceed particular thresholds
     # only updates the EEG.reject status with 1 for voltage threshold and 2 for voltage step
+    acceptedtrials = len([v for i,v in enumerate(EEG.reject) if v == 0])
+    if acceptedtrials == 0:
+        EEG.reject = [0] * len(EEG.reject) # acccept everything and go on
+    else:
+        origreject = copy.deepcopy(EEG.reject)
 
     OUTEEG = copy.deepcopy(EEG)
     
     if OUTEEG.trials > 0:
-    
-        if Threshold != False:
-            for cC in range(EEG.nbchan):
-                currentchanneldata = EEG.data[cC]
-                for cE in range(len(currentchanneldata)):
-                    # check high
-                    check = [i for i in currentchanneldata[cE] if i >= float(Threshold[1])]
-                    if len(check) > 0:
-                        OUTEEG.reject[cE] = 1
-                    # check low
-                    check = [i for i in currentchanneldata[cE] if i <= float(Threshold[0])]
-                    if len(check) > 0:
-                        OUTEEG.reject[cE] = 1
-            
-        if Step != False:
-            for cC in range(EEG.nbchan):
-                currentchanneldata = EEG.data[cC]
-                for cE in range(len(currentchanneldata)):
-                    check = [i for i in abs(numpy.diff(currentchanneldata[cE])) if i >= float(Step)]
-                    if len(check) > 0:
-                        OUTEEG.reject[cE] = 2
-                        
-        if NaN != False:
-            for cC in range(EEG.nbchan):
-                for cE in range(len(currentchanneldata)):
-                    # if the entire epoch is nan
-                    if len(EEG.data[cC][cE]) == numpy.count_nonzero(numpy.isnan(EEG.data[cC][cE])):
-                        OUTEEG.reject[cE] = 4
-                        
-                    # if the entire epoch is zero
-                    if len(EEG.data[cC][cE]) == (len(EEG.data[cC][cE]) - numpy.count_nonzero(EEG.data[cC][cE])):
-                        OUTEEG.reject[cE] = 4
+
+        for cC in range(EEG.nbchan):
+            currentchanneldata = EEG.data[cC]
+            for cE in range(len(currentchanneldata)):
+                # check high
+                check = [i for i in currentchanneldata[cE] if i >= float(Threshold[1])]
+                if len(check) > 0:
+                    OUTEEG.reject[cE] = 1
+                # check low
+                check = [i for i in currentchanneldata[cE] if i <= float(Threshold[0])]
+                if len(check) > 0:
+                    OUTEEG.reject[cE] = 1
+        
+        for cC in range(EEG.nbchan):
+            currentchanneldata = EEG.data[cC]
+            for cE in range(len(currentchanneldata)):
+                check = [i for i in abs(numpy.diff(currentchanneldata[cE])) if i >= float(Step)]
+                if len(check) > 0:
+                    OUTEEG.reject[cE] = 2
+             
+        for cC in range(EEG.nbchan):
+            for cE in range(len(currentchanneldata)):
+                # if the entire epoch is nan
+                if len(EEG.data[cC][cE]) == numpy.count_nonzero(numpy.isnan(EEG.data[cC][cE])):
+                    OUTEEG.reject[cE] = 4
+                    
+                # if the entire epoch is zero
+                if len(EEG.data[cC][cE]) == (len(EEG.data[cC][cE]) - numpy.count_nonzero(EEG.data[cC][cE])):
+                    OUTEEG.reject[cE] = 4
                         
 
     OUTEEG.acceptedtrials = len([v for i,v in enumerate(OUTEEG.reject) if v == 0])
+    if OUTEEG.acceptedtrials == 0:
+        if Flip == 0:
+            # backflip
+            Threshold = numpy.multiply(Threshold, 1.5)
+            Step = numpy.multiply(Step, 2)
+            OUTEEG = voltagethreshold(EEG, Threshold=Threshold, Step=Step, NaN=NaN, Flip=1)
+        else:
+            OUTEEG.reject = copy.deepcopy(origreject)
+        
     return OUTEEG
 
 def simplezwave(EEG, BaselineWindow=False, ddof=1):
@@ -3510,8 +3533,6 @@ def reportingwindow(fig, eggs=None, waveforms=None, bars=None, alternatelabelsat
             labelfontsize=16
             if ncol > 5:
                 labelfontsize=labelfontsize-4
-            if len(bars[cA].values) > 2:
-                labelfontsize=labelfontsize-4
                 
             valuefontsize=10
             if ncol > 5:
@@ -3526,6 +3547,52 @@ def reportingwindow(fig, eggs=None, waveforms=None, bars=None, alternatelabelsat
             
         matplotlib.pyplot.show()
 
+
+def pthreepipe(EEG):
+    OUTEEG = copy.deepcopy(EEG)
+    OUTEEG = simplefilter(OUTEEG, Design = 'savitzky-golay', Order = 6)
+    OUTEEG.acceptedtrials = len([v for i,v in enumerate(OUTEEG.reject) if v == 0])
+    
+    # creates a stimulus locked model ERP.
+    [outsum, outvect, xtime] = createsignal(
+         Window = [-0.1, 1.0],
+         Latency =   [ 0.08,  0.25, 0.35],
+         Amplitude = [-0.1,  -0.45, 0.50],
+         Width =     [40,       80,  180],
+         Shape =     [0,         0,    0],
+         Smoothing = [0,         0,    0],
+         OverallSmooth = 20, 
+         Srate = 250.0)
+    
+    #OUTEEG = voltagethreshold(OUTEEG, Threshold = [-100.0, 100.0], Step = 50.0)
+    OUTEEG = antiphasedetection(OUTEEG, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'C3', 'C4'], Template=outsum[closestidx(xtime, 0.200):closestidx(xtime, 0.800)])
+    OUTEEG = antiphasedetection(OUTEEG, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'C3', 'C4'])
+    #OUTEEG = voltagethreshold(OUTEEG, Threshold = [-100.0, 100.0], Step = 50.0)
+    #OUTEEG = netdeflectiondetection(OUTEEG, Threshold=-10, Direction='negative', Window = [0.200, 0.800],Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'C3', 'C4'])
+    
+    return OUTEEG
+
+def ernpipe(EEG):
+    OUTEEG = copy.deepcopy(EEG)
+    OUTEEG =simplefilter(OUTEEG, Design = 'savitzky-golay', Order = 6)
+    OUTEEG.acceptedtrials = len([v for i,v in enumerate(OUTEEG.reject) if v == 0])
+    
+    [outsum, outvect, xtime] = createsignal(
+         Window =    [-0.500,  1.0],
+         Latency =   [-0.10, 0.15],
+         Amplitude = [-0.5, 0.25],
+         Width =     [100,   180],
+         Shape =     [0,    0],
+         Smoothing = [0,    0],
+         OverallSmooth = 20, 
+         Srate = 250.0)
+    
+    #EEGresp = voltagethreshold(EEGresp, Threshold = [-100.0, 100.0], Step = 50.0)
+    OUTEEG = antiphasedetection(OUTEEG, Threshold=0.0, Window = [-0.250, 0.200], Channel=['FZ', 'FC1', 'FC2', 'CZ'], Template=outsum[closestidx(xtime, -0.250):closestidx(xtime, 0.200)])
+    OUTEEG = antiphasedetection(OUTEEG, Threshold=0.0, Window = [-0.250, 0.200], Channel=['FZ', 'FC1', 'FC2', 'CZ'])
+    #OUTEEG2 = netdeflectiondetection(OUTEEG, Threshold=10, Direction='positive', Window = [-0.250, 0.200],Channel=['FZ', 'FC1', 'FC2', 'CZ'])
+
+    return OUTEEG
 
     
 # # # # #
