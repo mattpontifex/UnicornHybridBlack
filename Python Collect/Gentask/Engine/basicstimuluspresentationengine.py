@@ -255,11 +255,9 @@ class Engine():
                 self.experimenterwin.flip()
         
         
-        
             self.participantwin.winHandle.maximize() 
             self.participantwin.winHandle.activate() 
-        
-        
+            
             #####  Test Monitor #####  
             if self.expdisp: # Setup notifications for experimenter
                 self.experimenternotificationtext.setText('verifying monitor refresh rate...'); self.experimenterwin.flip()
@@ -319,6 +317,9 @@ class Engine():
                     for n in range(0,len(self.instructioncard)):
                         
                         if not self.quit:
+                                            
+                            self.participantwin.winHandle.maximize() 
+                            self.participantwin.winHandle.activate() 
                             
                             if self.expdisp:
                                 if not self.pauseatstart:

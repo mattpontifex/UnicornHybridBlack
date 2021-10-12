@@ -3551,7 +3551,7 @@ def reportingwindow(fig, eggs=None, waveforms=None, bars=None, alternatelabelsat
 def pthreepipe(EEG):
     OUTEEG = copy.deepcopy(EEG)
     OUTEEG = simplefilter(OUTEEG, Design = 'savitzky-golay', Order = 6)
-    OUTEEG.acceptedtrials = len([v for i,v in enumerate(OUTEEG.reject) if v == 0])
+    #OUTEEG.acceptedtrials = len([v for i,v in enumerate(OUTEEG.reject) if v == 0])
     
     # creates a stimulus locked model ERP.
     [outsum, outvect, xtime] = createsignal(
@@ -3565,17 +3565,19 @@ def pthreepipe(EEG):
          Srate = 250.0)
     
     #OUTEEG = voltagethreshold(OUTEEG, Threshold = [-100.0, 100.0], Step = 50.0)
-    OUTEEG = antiphasedetection(OUTEEG, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'C3', 'C4'], Template=outsum[closestidx(xtime, 0.200):closestidx(xtime, 0.800)])
-    OUTEEG = antiphasedetection(OUTEEG, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'C3', 'C4'])
+    OUTEEG = antiphasedetection(OUTEEG, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'POZ', 'P3', 'P4', 'CP3', 'CP4', 'C3', 'C4'], Template=outsum[closestidx(xtime, 0.200):closestidx(xtime, 0.800)])
+    OUTEEG = antiphasedetection(OUTEEG, Threshold=0.0, Window = [0.200, 0.800], Channel=['CZ', 'CPZ', 'PZ', 'POZ', 'P3', 'P4', 'CP3', 'CP4', 'C3', 'C4'])
     #OUTEEG = voltagethreshold(OUTEEG, Threshold = [-100.0, 100.0], Step = 50.0)
     #OUTEEG = netdeflectiondetection(OUTEEG, Threshold=-10, Direction='negative', Window = [0.200, 0.800],Channel=['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'C3', 'C4'])
-    
+    if OUTEEG.acceptedtrials == 0:
+        OUTEEG.reject = [0] * len(OUTEEG.reject)
+        
     return OUTEEG
 
 def ernpipe(EEG):
     OUTEEG = copy.deepcopy(EEG)
     OUTEEG =simplefilter(OUTEEG, Design = 'savitzky-golay', Order = 6)
-    OUTEEG.acceptedtrials = len([v for i,v in enumerate(OUTEEG.reject) if v == 0])
+    #OUTEEG.acceptedtrials = len([v for i,v in enumerate(OUTEEG.reject) if v == 0])
     
     [outsum, outvect, xtime] = createsignal(
          Window =    [-0.500,  1.0],
@@ -3591,7 +3593,9 @@ def ernpipe(EEG):
     OUTEEG = antiphasedetection(OUTEEG, Threshold=0.0, Window = [-0.250, 0.200], Channel=['FZ', 'FC1', 'FC2', 'CZ'], Template=outsum[closestidx(xtime, -0.250):closestidx(xtime, 0.200)])
     OUTEEG = antiphasedetection(OUTEEG, Threshold=0.0, Window = [-0.250, 0.200], Channel=['FZ', 'FC1', 'FC2', 'CZ'])
     #OUTEEG2 = netdeflectiondetection(OUTEEG, Threshold=10, Direction='positive', Window = [-0.250, 0.200],Channel=['FZ', 'FC1', 'FC2', 'CZ'])
-
+    if OUTEEG.acceptedtrials == 0:
+        OUTEEG.reject = [0] * len(OUTEEG.reject)
+        
     return OUTEEG
 
     
