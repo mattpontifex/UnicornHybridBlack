@@ -1,4 +1,5 @@
 import os
+from os.path import exists
 from sys import platform
 try:
     import Engine.xcat as xcat
@@ -355,7 +356,8 @@ def checkoddballperf(task, show=True):
     wavechunk = None
     
     # if the task finished then pull the data
-    if task.finished:
+    if task.finished and exists(task.outputfile.split('.')[0] + '.csv'):
+        
         EEG = eegpipe.readUnicornBlack(task.outputfile.split('.')[0] + '.csv')
         EEG = eegpipe.simplefilter(EEG, Filter = 'Notch', Cutoff = [60.0])
         EEG = eegpipe.simplefilter(EEG, Filter = 'Bandpass', Design = 'Butter', Cutoff = [0.5, 30.0], Order=3)
@@ -590,7 +592,7 @@ def checkflankerperf(task, show=True):
     wavechunk = None
     
     # if the task finished then pull the data
-    if task.finished:
+    if task.finished and exists(task.outputfile.split('.')[0] + '.csv'):
         EEG = eegpipe.readUnicornBlack(task.outputfile.split('.')[0] + '.csv')
         EEG = eegpipe.simplefilter(EEG, Filter = 'Notch', Cutoff = [60.0])
         EEG = eegpipe.simplefilter(EEG, Filter = 'Bandpass', Design = 'Butter', Cutoff = [0.5, 30.0], Order=3)
@@ -866,7 +868,7 @@ def checkn2backperf(task, show=True):
     eggchunk = None
     wavechunk = None
     # if the task finished then pull the data
-    if task.finished:
+    if task.finished and exists(task.outputfile.split('.')[0] + '.csv'):
         EEG = eegpipe.readUnicornBlack(task.outputfile.split('.')[0] + '.csv')
         EEG = eegpipe.simplefilter(EEG, Filter = 'Notch', Cutoff = [60.0])
         EEG = eegpipe.simplefilter(EEG, Filter = 'Bandpass', Design = 'Butter', Cutoff = [0.5, 30.0], Order=3)
@@ -1110,7 +1112,7 @@ def checkcontinousn2backperf(task, show=True):
     wavechunk = None
     
     # if the task finished then pull the data
-    if task.finished:
+    if task.finished and exists(task.outputfile.split('.')[0] + '.csv'):
         EEG = eegpipe.readUnicornBlack(task.outputfile.split('.')[0] + '.csv')
         EEG = eegpipe.simplefilter(EEG, Filter = 'Notch', Cutoff = [60.0])
         EEG = eegpipe.simplefilter(EEG, Filter = 'Bandpass', Design = 'Butter', Cutoff = [0.5, 30.0], Order=3)
