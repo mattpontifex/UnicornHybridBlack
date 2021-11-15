@@ -5,6 +5,7 @@ import os
 import copy 
 import string
 import math
+import time
 import numpy
 numpy.seterr(divide='ignore', invalid='ignore')
 import pickle
@@ -24,6 +25,12 @@ import matplotlib.mlab as mlab
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 from matplotlib.widgets import Button
 
+import sys
+import logging as log
+import tkinter as tk
+from tkinter import filedialog
+
+
 #pip install git+git://github.com/tknapen/FIRDeconvolution.git
 
 try:
@@ -38,6 +45,7 @@ from lmfit import minimize, Parameters
 import peakutils
 from peakutils.plot import plot as peakutilspplot
 
+
 #import neurokit2
 
 #https://github.com/neuropsychology/NeuroKit
@@ -50,10 +58,540 @@ from peakutils.plot import plot as peakutilspplot
 #%matplotlib qt
 
 
+def curryreader(inputfilename='', plotdata = 1, verbosity = 1):
+    """Curry Reader Help
+
+    Usage:
+    currydata = read(inputfilename = '', plotdata = 1, verbosity = 2)
+    
+    Inputs:
+    inputfilename:      if left empty, reader will prompt user with file selection box, otherwise specify filename with path;
+                        supported files are: raw float (cdt), ascii (cdt), legacy raw float (dat) and legacy ascii (dat)
+    plotdata:           plotdata = 0, don't show plot
+                        plotdata = 1, show plot (default)  
+                        plotdata = x, with x > 1, shows and automatically closes plot after x seconds
+    verbosity:          1 is low, 2 is medium (default) and 3 is high
+    
+    Output as dictionary with keys:
+    'data'              functional data matrix (e.g. EEG, MEG) with dimensions (samples, channels)
+    'info'              data information with keys: {'samples', 'channels', 'trials', 'samplingfreq'}
+    'labels'            channel labels list
+    'sensorpos'         channel locations matrix [x,y,z]
+    'events'            events matrix where every row corresponds to: [event latency, event type, event start, event stop]
+    'annotations'       events annotation list
+    'epochinfo'         epochs matrix where every row corresponds to: [number of averages, total epochs, type, accept, correct, response, response time]
+    'epochlabels'       epoch labels list
+    'impedancematrix'   impedance matrix with max size (channels, 10), corresponding to last ten impedance measurements
+    'landmarks'         functional, HPI or headshape landmarks locations
+    'landmarkslabels'   labels for functional (e.g. LPA, Nasion,...), HPI (e.g. HPI 1, HPI 2,...) or headshape (e.g. H1, H2,...) landmarks 
+    'hpimatrix'         HPI-coil measurements matrix (Orion-MEG only) where every row is: [measurementsample, dipolefitflag, x, y, z, deviation] 
+
+    2021 - Compumedics Neuroscan
+    """
+    # configure verbosity logging    
+    verbositylevel = lambda verbosity : log.WARNING if verbosity == 1 else (log.INFO if verbosity == 2 else (log.DEBUG if verbosity == 3 else log.INFO))
+    log.basicConfig(format='%(levelname)s: %(message)s',  level = verbositylevel(verbosity))
+   
+    if inputfilename == '':
+        try:
+            # create root window for filedialog
+            root = tk.Tk()
+            root.withdraw()
+
+            # check if last used directory was kept
+            lastdirfilename = 'lastdir.txt'
+            if (os.path.isfile(lastdirfilename)):
+                lastdirfile = open(lastdirfilename)
+                initdir = lastdirfile.read().strip()
+                lastdirfile.close()
+            else:
+                initdir = "/"
+
+            filepath = filedialog.askopenfilename(initialdir = initdir, title = "Open Curry Data File", filetypes=(("All Curry files", "*.cdt *.dat"),("cdt files", "*.cdt"),("dat files", "*.dat"),("all files", "*.*")))
+            root.destroy()
+
+            lastdirfile = open(lastdirfilename, 'w')
+            lastdirfile.write(os.path.dirname(filepath))
+            lastdirfile.close()
+            
+            # handle cancel
+            if not filepath:
+                raise Exception
+        except:
+            raise Exception("Unable to open file")
+    else:
+        filepath = inputfilename
+    
+    pathname = os.path.dirname(filepath)
+    filename = os.path.basename(filepath)
+
+    try:
+        basename, extension = filepath.split(".", maxsplit=1)
+    except:
+        raise Exception("Unsupported file, choose a cdt or dat file")
+
+    parameterfile = ''
+    parameterfile2 = ''
+    labelfile = ''
+    labelfile2 = ''
+    eventfile = ''
+    eventfile2 = ''
+    hpifile = ''
+
+    if extension == 'dat':
+        parameterfile = basename + '.dap'
+        labelfile = basename + '.rs3'
+        eventfile = basename + '.cef'
+        eventfile2 = basename + '.ceo'
+    elif extension == 'cdt' :
+        parameterfile = filepath + '.dpa'
+        parameterfile2 = filepath + '.dpo'
+        eventfile = filepath + '.cef'
+        eventfile2 = filepath + '.ceo'
+        hpifile = filepath + '.hpi'
+    else:
+        raise Exception("Unsupported extension, choose a cdt or dat file")
+       
+    if verbosity > 1:
+        log.info('Reading file %s ...', filename)
+
+    # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    # open parameter file
+    
+    contents = []
+    
+    try:
+        fid = open(parameterfile,'r')
+        contents = fid.read()
+    except:
+        log.debug('Could not open parameter file, trying alternative extension...')
+    
+    # open alternative parameter file
+    if not contents:
+        try:
+            fid = open(parameterfile2,'r')
+            contents = fid.read()
+        except FileNotFoundError:
+            raise FileNotFoundError("Parameter file not found")
+        except:
+            raise Exception("Could not open alternative parameter file")
+    
+    fid.close()
+    
+    if not contents:
+        raise Exception("Parameter file is empty")
+    
+    # check for compressed file format
+    ctok = 'DataGuid'
+    ix = contents.find(ctok)
+    ixstart = contents.find('=',ix) + 1
+    ixstop = contents.find('\n',ix)
+    
+    if ix != -1 :
+        text = contents[ixstart:ixstop].strip()
+        if text == '{2912E8D8-F5C8-4E25-A8E7-A1385967DA09}':
+            raise Exception ("Unsupported compressed data format, use Curry to convert file to raw float format")
+    
+    # read parameters from parameter file
+    # tokens (second line is for Curry 6 notation)
+    tok = ['NumSamples', 'NumChannels', 'NumTrials', 'SampleFreqHz',  'TriggerOffsetUsec',  'DataFormat', 'DataSampOrder',   'SampleTimeUsec',
+            'NUM_SAMPLES','NUM_CHANNELS','NUM_TRIALS','SAMPLE_FREQ_HZ','TRIGGER_OFFSET_USEC','DATA_FORMAT','DATA_SAMP_ORDER', 'SAMPLE_TIME_USEC']
+    
+    # scan keywords - all keywords must exist!
+    nt = len(tok)
+    a = [0] * nt                                    # initialize
+    for i in range(nt):
+       ctok = tok[i]
+       ix = contents.find(ctok)
+       ixstart = contents.find('=',ix) + 1          # skip =
+       ixstop = contents.find('\n',ix)
+       if ix != -1 :
+           text = contents[ixstart:ixstop].strip()
+           if text == 'ASCII' or text == 'CHAN' :   # test for alphanumeric values
+               a[i] = 1
+           elif text.isnumeric() :
+               a[i] = float(text)                   # assign if it was a number
+    
+    # derived variables.  numbers (1) (2) etc are the token numbers
+    nSamples    = int(a[0]  + a[int(0 + nt / 2)])
+    nChannels   = int(a[1]  + a[int(1 + nt / 2)])
+    nTrials     = int(a[2]  + a[int(2 + nt / 2)])
+    fFrequency  =     a[3]  + a[int(3 + nt / 2)]
+    fOffsetUsec =     a[4]  + a[int(4 + nt / 2)]
+    nASCII      = int(a[5]  + a[int(5 + nt / 2)])
+    nMultiplex  = int(a[6]  + a[int(6 + nt / 2)])
+    fSampleTime =     a[7]  + a[int(7 + nt / 2)]
+
+    datainfo = { "samples" : nSamples, "channels" : nChannels, "trials" : nTrials, "samplingfreq" : fFrequency }
+    if verbosity > 1:
+        log.info('Number of samples = %s, number of channels = %s, number of trials/epochs = %s, sampling frequency = %s Hz', str(nSamples), str( nChannels), str(nTrials), str(fFrequency))
+                    
+    if fFrequency == 0 or fSampleTime != 0:
+        fFrequency = 1000000 / fSampleTime
+    
+    # try to guess number of samples based on datafile size
+    if nSamples < 0:
+        if nASCII == 1:
+            raise Exception("Number of samples cannot be guessed from ASCII data file. Use Curry to convert this file to Raw Float format")
+        else:
+            log.warning('Number of samples not present in parameter file. It will be estimated from size of data file')
+            fileSize = os.path.getsize(filepath)
+            nSamples = fileSize / (4 * nChannels * nTrials)
+    
+    #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+    # search for Impedance Values
+    tixstart = contents.find('IMPEDANCE_VALUES START_LIST')
+    tixstart = contents.find('\n',tixstart)
+    tixstop = contents.find('IMPEDANCE_VALUES END_LIST')
+    
+    impedancelist = [] 
+    
+    if tixstart != -1 and tixstop != 1 :
+        text = contents[tixstart:tixstop - 1].split()
+        for imp in text:
+           if float(imp) != float(-1):
+               impedancelist.append(float(imp))
+           else:
+               impedancelist.append(numpy.nan)
+    
+        # Curry records last 10 impedances
+        impedancematrix = numpy.asarray(impedancelist, dtype = numpy.float).reshape(int(len(impedancelist) / nChannels), nChannels)
+    
+    if impedancematrix.any():
+        if verbosity > 1:
+            log.info('Found impedance matrix')
+        
+    #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    # open label file
+    if extension == 'dat':
+        try:
+            fid = open(labelfile,'r')
+            contents = fid.read()
+            fid.close()
+        except:
+            log.warning('Found no label file')
+    
+    # read labels from label file
+    # initialize labels
+    labels = [''] * nChannels
+    
+    for i in range(nChannels):
+        labels[i] = 'EEG' + str(i + 1)
+    
+    # scan for LABELS (occurs four times per channel group)
+    ix = findtokens('\nLABELS', contents)  
+    nc = 0
+    
+    if ix:
+        for i in range(3,len(ix),4):                    # loop over channel groups
+            text = contents[ix[i - 1] : ix[i]]
+            text = text[text.find('\n', 1):].split()
+            last = nChannels - nc
+            numLabels = min(last, len(text))
+            for j in range(numLabels):                 # loop over labels
+                labels[nc] = text[j]
+                nc += 1
+        if verbosity > 1:
+            log.info('Found channel labels')
+    else:
+        log.warning('Using dummy labels (EEG1, EEG2, ...)')
+   
+    #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+    # search for landmarks
+    landmarks = []
+    landmarkslabels = []    
+
+    # scan for SENSORS (occurs four times per channel group)
+    ix = findtokens('\nLANDMARKS', contents)   
+    nc = 0
+    totallandmarks = 0
+
+    if ix:
+        for i in range(3,len(ix),4):                    # first pass over groups to find total of landmarks
+            text = contents[ix[i - 1] : ix[i]]
+            text = text[text.find('\n', 1):].splitlines()[1:]
+            totallandmarks += len(text)
+
+        lmpositions = numpy.zeros([totallandmarks, 3])                  
+        for i in range(3,len(ix),4):                    # loop over channel groups
+            text = contents[ix[i - 1] : ix[i]]
+            text = text[text.find('\n', 1):].split()
+            last = totallandmarks - nc
+            numlandmarks = min(last, int(len(text) / 3))
+            for j in range(0, numlandmarks * 3, 3):
+                lmpositions[nc][:] = numpy.array(text[j : j + 3])
+                nc += 1
+
+        landmarks = lmpositions
+        if verbosity > 1:
+            log.info('Found landmarks')
+        
+    # landmark labels
+    ix = findtokens('\nLM_REMARKS', contents)   
+    landmarkslabels = [''] * totallandmarks
+    start = 0
+    
+    if ix and totallandmarks:               
+        for i in range(3,len(ix),4):                    # loop over channel groups
+            text = contents[ix[i - 1] : ix[i]]
+            text = text[text.find('\n', 1):].splitlines()[1:]
+            landmarkslabels[start:len(text)] = text
+            start += len(text)
+
+    ##########################################################################
+    # read sensor locations from label file
+    sensorpos = []
+    
+    # scan for SENSORS (occurs four times per channel group)
+    ix = findtokens('\nSENSORS', contents) 
+    nc = 0
+    
+    if ix:
+        grouppospersensor = []
+        maxpersensor = 0
+        numchanswithpos = 0
+        for i in range(3,len(ix),4):                                    # first pass over groups to determine sensorpos and maxpersensor sizes
+            text = contents[ix[i - 1] : ix[i]]
+            text = text[text.find('\n', 1):].splitlines()[1:]
+            numchanswithpos += len(text)
+            pospersensor = len(text[0].split())
+            maxpersensor = max (pospersensor, maxpersensor)
+            grouppospersensor.append(pospersensor)
+
+        if ((maxpersensor == 3 or maxpersensor == 6) and                # 3 is (x,y,z) per sensor (EEG,MEG), 6 is (x,y,z,x1,y1,z1) per sensor (MEG)
+            numchanswithpos > 0 and numchanswithpos <= nChannels):                  
+            
+            positions = numpy.zeros((numchanswithpos, maxpersensor))     
+            
+            for group, i in enumerate(range(3,len(ix),4)):              # loop over channel groups
+                text = contents[ix[i - 1] : ix[i]]
+                text = text[text.find('\n', 1):].split()
+                last = nChannels - nc
+                pospersensor = grouppospersensor[group]
+                numchannels = min(last, int(len(text) / pospersensor))
+                for j in range(0, numchannels * pospersensor, pospersensor):
+                    positions[nc][:pospersensor] = numpy.array(text[j : j + pospersensor])
+                    nc += 1
+
+            sensorpos = positions
+            
+            if verbosity > 1:
+                log.info('Found sensor positions')
+        else:
+            log.warning('Reading sensor positions failed (dimensions inconsistency)')
+    else:
+        log.warning('No sensor positions were found')
+    
+    #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    # search for epoch labels
+    epochlabelslist = []
+
+    if extension == 'dat':
+        try:
+            fid = open(parameterfile,'r')
+            contents = fid.read()
+            fid.close()
+        except:
+            log.warning('Found no parameter file')
+
+    ctok = '\nEPOCH_LABELS'
+    if ctok in contents:
+        tixstart = contents.find('EPOCH_LABELS START_LIST')
+        tixstart = contents.find('\n',tixstart)
+        tixstop = contents.find('EPOCH_LABELS END_LIST')
+    
+        if tixstart != -1 and tixstop != 1 :
+            epochlabelslist = contents[tixstart:tixstop - 1].split()
+    
+    if epochlabelslist:
+        if verbosity > 1:
+            log.info('Found epoch labels')
+        
+    #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    # search for epoch information
+    tixstart = contents.find('EPOCH_INFORMATION START_LIST')
+    tixstart = contents.find('\n',tixstart)
+    tixstop = contents.find('EPOCH_INFORMATION END_LIST')
+    infoelements = 7
+    epochinformation = []
+
+    if tixstart != -1 and tixstop != 1 :
+        epochinformation = numpy.zeros((len(epochlabelslist), infoelements))
+        text = contents[tixstart:tixstop - 1].split()
+        for i in range(0, len(text), infoelements):
+            for j in range(infoelements):
+                epochinformation[int(i / infoelements)][j] = int(text[i + j])
+ 
+    if epochinformation.any():
+        if verbosity > 1:
+            log.info('Found epoch information')
+   
+    #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    # read events from event file
+    # initialize events
+    events = []
+    annotations = []
+    contents = []
+    
+    try:
+        fid = open(eventfile,'r')
+        contents = fid.read()
+    except:
+        log.debug('Trying event file alternative extension...')
+    
+    # open alternative event file
+    if fid.closed :
+        try:
+            fid = open(eventfile2,'r')
+            contents = fid.read()
+        except:
+            log.debug('Found no event file')
+    
+    fid.close()
+    
+    if contents:
+        # scan for NUMBER_LIST (occurs five times)
+        tixstart = contents.find('NUMBER_LIST START_LIST')
+        tixstart = contents.find('\n',tixstart)
+        tixstop = contents.find('NUMBER_LIST END_LIST')
+        numberelements = 11
+        numbereventprops = 4
+        
+        text = contents[tixstart:tixstop - 1].split()
+        events = numpy.zeros((0,numbereventprops))
+        
+        for i in range(0, len(text), numberelements):        
+            sample = int(text[i])
+            etype = int(text[i + 2])
+            startsample = int(text[i + 4])
+            endsample = int(text[i + 5])
+            newevent = numpy.array([sample, etype, startsample, endsample])
+            events = numpy.vstack([events, newevent])          # concat new event in events matrix
+        
+        # scan for REMARK_LIST (occurs five times)
+        tixstart = contents.find('REMARK_LIST START_LIST')
+        tixstart = contents.find('\n',tixstart)
+        tixstop = contents.find('REMARK_LIST END_LIST')
+        
+        if tixstart != -1 and tixstop != 1 :
+            annotations = contents[tixstart:tixstop - 1].splitlines()
+
+        if verbosity > 1:
+            log.info('Found events')
+
+    #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    # read HPI coils (only Orion-MEG) if present
+    
+    hpimatrix = []
+    contents = []
+
+    try:
+        fid = open(hpifile,'r')
+        contents = fid.read()
+    except:
+        log.debug('Found no HPI file')
+    
+    fid.close()
+    
+    if contents:
+        # get file version and number of coils
+        tixstart = contents.find('FileVersion')
+        tixstop = contents.find('\n',tixstart)
+        text = contents[tixstart:tixstop].split()
+        hpifileversion = text[1]
+
+        tixstart = contents.find('NumCoils')
+        tixstop = contents.find('\n',tixstart)
+        text = contents[tixstart:tixstop].split()
+        numberofcoils = text[1]
+
+        hpimatrix = numpy.loadtxt(hpifile, dtype=numpy.float32, skiprows=3)
+        
+        if verbosity > 1:
+            log.info('Found HPI matrix')
+        
+    #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    #% read data file   
+    
+    data = []
+
+    try:
+        itemstoread = nSamples * nTrials * nChannels
+        if nASCII == 1:
+            data = numpy.fromfile(filepath, dtype=numpy.float32, count = itemstoread, sep = ' ').reshape(nSamples * nTrials, nChannels)
+        else:
+            data = numpy.fromfile(filepath, dtype=numpy.float32, count = itemstoread,).reshape(nSamples * nTrials, nChannels)
+    except FileNotFoundError:
+        raise FileNotFoundError("Data file not found")
+    except:
+        raise Exception("Could not open data file")
+        
+    if nSamples * nTrials != data.shape[0]:
+        log.warning('Inconsistent number of samples. File may be displayed incompletely')
+        nSamples = data.shape[0] / nTrials
+    
+    # transpose?
+    if nMultiplex == 1:
+        data = data.transpose()
+    
+    if plotdata > 0 and data.any():
+        time = numpy.linspace(fOffsetUsec / 1000, fOffsetUsec / 1000 + (nSamples * nTrials - 1) * 1000 / fFrequency, nSamples * nTrials, dtype=numpy.float32)
+        # avoid logging output from matplotlib
+        log.getLogger('matplotlib.font_manager').disabled = True
+        # stacked plot
+        amprange = max(abs(data.min()), abs(data.max()))
+        shift = numpy.linspace((nChannels - 1) * amprange * 0.3, 0, nChannels,  dtype=numpy.float32)
+        data += numpy.tile(shift, (nSamples * nTrials, 1))
+        fig, ax = matplotlib.pyplot.subplots()
+        ax.plot(time, data)
+        ax.set_yticks(shift)
+        ax.set_yticklabels(labels)
+        ax.set_xlabel('Time [ms]')
+        ax.set_title(filename)
+        if verbosity > 1:
+            log.info('Found data file')
+        if plotdata == 1:
+            matplotlib.pyplot.show()
+        elif plotdata > 1:
+            matplotlib.pyplot.show(block=False)
+            matplotlib.pyplot.pause(plotdata)
+            matplotlib.pyplot.close()
+        else:
+            log.warning("Invalid plotdata input: please see description in help")
+       
+    # assamble output dict
+    output = {'data'            : data, 
+              'info'            : datainfo, 
+              'labels'          : labels,
+              'sensorpos'       : sensorpos, 
+              'events'          : events,
+              'annotations'     : annotations,
+              'epochinfo'       : epochinformation,
+              'epochlabels'     : epochlabelslist,
+              'impedances'      : impedancematrix,
+              'landmarks'       : landmarks,
+              'landmarkslabels' : landmarkslabels,
+              'hpimatrix'       : hpimatrix}
+
+    return output
 
 
+def findtokens(token, contents):
+    """findtoken
+       Returns indices of token occurrences in input string contents.
+    """
+    if not token or not contents:
+        raise Exception("Invalid input for finding token")
 
-
+    tokenindices = []
+    index   = 0
+    while index < len(contents):
+            index = contents.find(token, index)
+            if index == -1:
+                break
+            tokenindices.append(index)
+            index += len(token)
+    return tokenindices
 
 
 def vectorlength(group1, group2):
@@ -123,12 +661,15 @@ def crushcolormap(cmap=False, ratio=False, outsize=False):
     return newcmap
     
 
-def crushparula(mapsize=False):
+def crushparula(mapsize=False, flip=False):
     
     if mapsize == False:
         mapsize = 256
         
     segs = ['#00004B', '#1C2C75', '#38598C', '#2B798B', '#1E9B8A', '#85D54A', '#FDE725', '#F9FB0E'] 
+    
+    if flip:
+        segs.reverse()
     
     newcmap = LinearSegmentedColormap.from_list("", segs, mapsize) 
     
@@ -287,10 +828,23 @@ def eegpad(Channels, Amplitude, searchlimit=500):
 
     return [Channels, Amplitude]
 
-def eggheadplot(Channels, Amplitude, Steps=512, Scale=False, Colormap=False, Method='cubic', Complete=True, Style='Full', TickValues=False, BrainOpacity=0.2, Title=False, Electrodes=True, **kwargs):
+def eggheadplot(Channels, Amplitude, Steps=512, Scale=False, Colormap=False, Method='cubic', Complete=True, Style='Full', TickValues=False, BrainOpacity=0.2, Title=False, Electrodes=True, Pad=True, Contours=False, debug=False, **kwargs):
 
     Method = checkdefaultsettings(Method, ['cubic', 'linear'])
     Style = checkdefaultsettings(Style, ['Full', 'Outline', 'None'])
+    if debug:
+        print('Method ' + Method)
+        print('Style ' + Style)
+    
+    fig = matplotlib.pyplot.figure()
+    fig.tight_layout()
+    #fig.patch.set_facecolor('#FFFFFF')
+    try:
+        fig.canvas.window().statusBar().setVisible(False) 
+    except:
+        pass
+    
+    ax = fig.add_gridspec(1,1, wspace=0.2, hspace=0.80)
     
     # check size 
     multiinput = any(isinstance(el, list) for el in Channels)
@@ -303,16 +857,9 @@ def eggheadplot(Channels, Amplitude, Steps=512, Scale=False, Colormap=False, Met
             nrow = int(numpy.ceil(numpy.divide(len(Channels),4)))
             ncol = 4
         
-        fig, ax = matplotlib.pyplot.subplots(nrow,ncol)
-    else:
-        fig, ax = matplotlib.pyplot.subplots(nrow,ncol)
-    
-    fig.tight_layout()
-    #fig.patch.set_facecolor('#FFFFFF')
-    try:
-        fig.canvas.window().statusBar().setVisible(False) 
-    except:
-        pass
+    if debug:
+        print('multiinput ' + ('%s' % multiinput))
+        print('nrow ' + ('%d' % nrow) + ', ncol ' + ('%d' % ncol))
     
     if Title == False:
         if multiinput:
@@ -321,46 +868,59 @@ def eggheadplot(Channels, Amplitude, Steps=512, Scale=False, Colormap=False, Met
                 Title.append(' ')
         else:
             Title = ' '
-    
-    if multiinput:
-        for cA in range(len(Channels)):
-            ax[cA].set_title(Title[cA] + '\n')
-    else:
-        ax.set_title(Title)
-    
+            
     if Colormap == False:
         Colormap = matplotlib.pyplot.cm.viridis
+        #Colormap = crushparula(256)
         
-    if multiinput:
-        #for axs in ax.flat:
-        #    im = axs.imshow(numpy.random.random((10,10)), vmin=Scale[0], vmax=Scale[1])
-        cbar_ax = fig.add_axes([0.323, 0.15, 0.4, 0.035])
-    else:
-        #im = ax.imshow(numpy.random.random((10,10)), vmin=Scale[0], vmax=Scale[1])
-        pos1 = ax.get_position()
-        cbar_ax = fig.add_axes([0.323, pos1.y0-0.05, 0.4, 0.035])
-    
     # configure ticks
     if TickValues == False:
         TickValues= matplotlib.ticker.AutoLocator()
         
-    norm = matplotlib.colors.Normalize(vmin=Scale[0], vmax=Scale[1])
-    fig.colorbar(matplotlib.cm.ScalarMappable(cmap=Colormap, norm=norm), cax=cbar_ax, orientation='horizontal', ticks=TickValues)
-    
-    if multiinput:
-        for cA in range(len(Channels)):
-            eggheadplot_sub(Channels[cA], Amplitude[cA], ax[cA], Steps=Steps, Scale=Scale, Colormap=Colormap, Method=Method, Complete=Complete, Style=Style, BrainOpacity=BrainOpacity, Electrodes=Electrodes)
-    
-    else:
-        eggheadplot_sub(Channels, Amplitude, ax, Steps=Steps, Scale=Scale, Colormap=Colormap, Method=Method, Complete=Complete, Style=Style, BrainOpacity=BrainOpacity, Electrodes=Electrodes)
+    if Scale == False:
+        pullscale = [0, 0]
+        for cA in range(len(Channels)): 
+            if min(Amplitude[cA]) < pullscale[0]:
+                pullscale[0] = min(Amplitude[cA])
+            if max(Amplitude[cA]) > pullscale[1]:
+                pullscale[1] = max(Amplitude[cA])
+        Scale = pullscale
         
+    axfontsize=16
+    cmsizey=0.015
+    cmsizex=0.12
+    if ncol > 2:
+        axfontsize = axfontsize-3
+        cmsizey=0.01
+        cmsizex=0.10
+    
+    axhead = ax[0, 0].subgridspec(nrow, ncol, wspace=0.4, hspace=0.05)  
+    crow = 0
+    countrow = 0
+    for cA in range(len(Channels)):   
+        axheadsub = fig.add_subplot(axhead[crow, cA])  
+        countrow = countrow + 1
+        if countrow > 4:
+            crow = crow + 1
+            countrow = 0
+            
+        eggheadplot_sub(Channels[cA], Amplitude[cA], axheadsub, Steps=Steps, Scale=Scale, Colormap=Colormap, Method=Method, Complete=Complete, Style=Style, BrainOpacity=BrainOpacity, Electrodes=Electrodes, Pad=Pad, Contours=Contours, debug=debug)
+        axheadsub.set_title(Title[cA] + '\n', color='black', fontweight='bold', fontsize=axfontsize, ha='center', va='center')
+            
+        pos1 = axheadsub.get_position()
+        norm = matplotlib.colors.Normalize(vmin=Scale[0], vmax=Scale[1])
+        fig.colorbar(matplotlib.cm.ScalarMappable(cmap=Colormap, norm=norm), cax=fig.add_axes([pos1.x0+0.015, pos1.y0-0.05, cmsizex, cmsizey]), orientation='horizontal', ticks=matplotlib.ticker.AutoLocator())
+    
     matplotlib.pyplot.show()
 
 
-def eggheadplot_sub(Channels, Amplitude, ax=None, Steps=512, Scale=False, Colormap=False, Method='cubic', Complete=True, Style='Full', BrainOpacity=0.2, Electrodes=True, Pad=True, Contours=False, **kwargs):
+def eggheadplot_sub(Channels, Amplitude, ax=None, Steps=512, Scale=False, Colormap=False, Method='cubic', Complete=True, Style='Full', BrainOpacity=0.2, Electrodes=True, Pad=True, Contours=False, debug=False, **kwargs):
     
     Method = checkdefaultsettings(Method, ['cubic', 'linear'])
     Style = checkdefaultsettings(Style, ['Full', 'Outline', 'None'])
+    if debug:
+        print('Method ' + Method)
+        print('Style ' + Style)
     
     realchannels = len(Channels)
     if Pad != False:
@@ -368,6 +928,12 @@ def eggheadplot_sub(Channels, Amplitude, ax=None, Steps=512, Scale=False, Colorm
     if Contours == True:
         Contours = 5
     Contours = int(Contours)
+    
+    if debug:
+        print('Pad ' + ('%s' % Pad))
+        print('Contours ' + ('%d' % Contours))
+        print('OrigChannels ' + ('%d' % realchannels))
+        print('Channels ' + ('%d' % len(Channels)))
     
     #matplotlib.pyplot.sca(ax)
     ax.spines['top'].set_visible(False)
@@ -463,6 +1029,9 @@ def eggheadplot_sub(Channels, Amplitude, ax=None, Steps=512, Scale=False, Colorm
     if Complete:
         zi = fill(zi)
     
+    if debug:
+        print(zi)
+        
     # gaussian kernal blurring
     zi = scipy.ndimage.gaussian_filter(copy.deepcopy(numpy.multiply(zi,1.2)), sigma=2.5, order=0)
     
@@ -483,13 +1052,23 @@ def eggheadplot_sub(Channels, Amplitude, ax=None, Steps=512, Scale=False, Colorm
         matplotlib.pyplot.plot(numpy.multiply(xvect[0:realchannels], 0.85), numpy.add(numpy.multiply(yvect[0:realchannels],0.8),-35), linestyle="None", marker = '.', color=markervalue)
         
     extent = numpy.min(x), numpy.max(x), numpy.min(y), numpy.max(y)
+    if debug:
+        print('Style ' + ('%s' % Style))
     if Style.upper() == ('Full').upper():
         try:
             framemask = matplotlib.image.imread('eggheadplot1.png')
+            if debug:
+                print('eggheadplot1 read in success')
         except:
+            if debug:
+                print('eggheadplot1 read in fail')
             try:
                 framemask = matplotlib.image.imread('Engine' + os.path.sep + 'eggheadplot1.png')
+                if debug:
+                    print('eggheadplot1 read in from Engine success')
             except:
+                if debug:
+                    print('eggheadplot1 read in from Engine fail')
                 framemask = matplotlib.image.imread('Gentask' + os.path.sep + 'Engine' + os.path.sep + 'eggheadplot1.png')
             
     elif Style.upper() == ('Outline').upper():
@@ -515,10 +1094,18 @@ def eggheadplot_sub(Channels, Amplitude, ax=None, Steps=512, Scale=False, Colorm
     if BrainOpacity != False:
         try:
             eggbrain = matplotlib.image.imread('eggheadplot4.png')
+            if debug:
+                print('eggheadplot4 read in success')
         except:
+            if debug:
+                print('eggheadplot4 read in fail')
             try:
                 eggbrain = matplotlib.image.imread('Engine' + os.path.sep + 'eggheadplot4.png')
+                if debug:
+                    print('eggheadplot4 read in from Engine success')
             except:
+                if debug:
+                    print('eggheadplot4 read in from Engine fail')
                 eggbrain = matplotlib.image.imread('Gentask' + os.path.sep + 'Engine' + os.path.sep + 'eggheadplot4.png')
         
         imgmask = eggbrain[:,:,0] == eggbrain[:,:,1];
@@ -865,6 +1452,45 @@ def msdatefromref(date1, date2):
 def closestidx(lst, K):
     return numpy.argmin(abs(numpy.subtract(lst, K)))
 
+def saferesample(invect, insample, outsample):
+    whatamiworkingwith = 'vector'
+    if len(invect) > 0:    
+        try:
+            if len(invect[0]) > 0:
+                whatamiworkingwith = 'matrix'
+        except:
+            pass
+    cPoints =  -1
+    if whatamiworkingwith == 'vector':
+        secofdata = numpy.divide(len(invect),insample)
+        cPoints = len(invect)
+    else:
+        secofdata = numpy.divide(len(invect[0]),insample)
+        cPoints = len(invect[0])
+    intime = numpy.linspace(0, secofdata, num=int(numpy.floor(numpy.multiply(secofdata, insample))))
+    insamples = numpy.linspace(0, cPoints, num=int(numpy.floor(numpy.multiply(secofdata, insample))))
+    outtime = numpy.linspace(0, secofdata, num=int(numpy.floor(numpy.multiply(secofdata, outsample))))
+    outsamples = numpy.linspace(0, cPoints, num=int(numpy.floor(numpy.multiply(secofdata, outsample))))
+    if whatamiworkingwith == 'vector':
+        outvect = [numpy.nan] * len(outtime)
+        for  cP in range(0, len(outtime)):
+            timindx = closestidx(intime, outtime[cP])
+            outvect[cP] = invect[timindx]
+    else:
+        outvect =  []
+        for cC in range(0, len(invect)):
+            outvectloc = [numpy.nan] * len(outtime)
+            for  cP in range(0, len(outtime)):
+                timindx = closestidx(intime, outtime[cP])
+                outvectloc[cP] = invect[cC][timindx]
+            outvect.append(outvectloc)  
+    output = {'data'          : outvect, 
+              'intime'        : intime, 
+              'insamples'     : insamples,
+              'outtime'       : outtime, 
+              'outsamples'    : outsamples}
+    return output
+
 
 ################################################################################################################################################
 ################################################################################################################################################
@@ -975,7 +1601,7 @@ def loadset(inputfile):
     
     
 
-def readEyeTribe(inputfile):
+def readEyeTribe(inputfile, merge=False):
     # function to read in pupillary data from the EyeTribe eye tracker
     
     head, tail = os.path.split(inputfile)
@@ -1098,8 +1724,9 @@ def readEyeTribe(inputfile):
         EEG.checkset()
         
         # see if there is behavioral data available
-        if (os.path.isfile(head + os.path.sep + tail.split('.')[0] + '.psydat')): 
-            EEG = mergetaskperformance(EEG, head + os.path.sep + tail.split('.')[0] + '.psydat')
+        if merge:
+            if (os.path.isfile(head + os.path.sep + tail.split('.')[0] + '.psydat')): 
+                EEG = mergetaskperformance(EEG, head + os.path.sep + tail.split('.')[0] + '.psydat')
     
         return EEG
     
@@ -1126,6 +1753,83 @@ def correctEyeTribe(EEG, Correction=False):
         
     
     return OUTEEG
+
+def readCurry(inputfile, merge=True, resample=False, approach=False, debug=False):        
+    # function to read in data from NeuroscanCurry
+    approach = checkdefaultsettings(approach, ['scipy', 'safe'])
+    
+    # create structure
+    EEG = eeglabstructure()
+    
+    currymodule = True
+    if currymodule:
+        head, tail = os.path.split(inputfile)
+        if (os.path.isfile(inputfile)): 
+            if debug:
+                print('trying to load data')
+            currydata = curryreader(inputfilename = inputfile, plotdata = 0, verbosity = 1)
+            if debug:
+                print('data loaded')
+            
+            EEG.filename = tail.split('.')[0]
+            EEG.filepath = head
+            EEG.nbchan = int(currydata['info']['channels'])
+            EEG.srate = float(currydata['info']['samplingfreq'])
+            EEG.pnts = int(currydata['info']['samples'])
+            EEG.trials = int(currydata['info']['trials'])-1
+            
+            # convert samples to time    
+            EEG.samples = list(range(0, EEG.pnts))
+            EEG.times = numpy.multiply(EEG.samples, numpy.divide(1.0, EEG.srate))
+            
+            for cchan in range(0, EEG.nbchan):
+                EEG.channels.append(currydata['labels'][cchan].translate({ord(c): None for c in string.whitespace}))
+                EEG.data.append(currydata['data'][:, cchan])
+            
+            if EEG.pnts > 0:
+                if resample:
+                    if approach == 'scipy':
+                        secofdata = numpy.divide(EEG.pnts,EEG.srate)
+                        EEG.samples = numpy.linspace(0, EEG.pnts, num=int(numpy.floor(numpy.multiply(secofdata, float(resample)))))
+                        EEG.times = numpy.multiply(list(range(0, len(EEG.samples))), numpy.divide(1.0, float(resample)))   
+                        for cchan in range(0, EEG.nbchan):
+                            EEG.data[cchan] = scipy.signal.resample(EEG.data[cchan], len(EEG.samples))
+                    else:
+                        outdat = saferesample(EEG.data, EEG.srate, float(resample))
+                        EEG.data = outdat['data']
+                        EEG.samples = outdat['outsamples']
+                        EEG.times = outdat['outtime']
+                        
+                    EEG.srate = float(resample)
+                    EEG.pnts = len(EEG.samples)
+        
+            EEG.events = [[0]*EEG.pnts]
+            EEG.eventsegments = ['Type']
+                     
+            if debug:
+                print('reading events')   
+            for dinfo in range(0, len(currydata['events'])):
+                currentindex = closestidx(EEG.samples, currydata['events'][dinfo,0])
+                EEG.events[0][currentindex] = float(currydata['events'][dinfo,1])
+                        
+            EEG.checkset()
+            
+            if debug:
+                print('merging behavior')   
+            if EEG.pnts > 0:
+                # see if there is behavioral data available
+                if (os.path.isfile(head + os.path.sep + tail.split('.')[0] + '.psydat')): 
+                    if merge:
+                        try:
+                            EEG = mergetaskperformance(EEG, head + os.path.sep + tail.split('.')[0] + '.psydat')
+                        except:
+                            pass
+        else:
+            EEG = None
+    else:
+        EEG = None
+        
+    return EEG
 
 def readUnicornBlack(inputfile):
     # function to read in data from the UnicornHybridBlack
@@ -1348,6 +2052,118 @@ def mergetaskperformance(EEG, filein):
 ################################################################################################################################################
 ################################################################################################################################################
 
+def makeitfit(vectout, vectin):
+    vectinout = copy.deepcopy(vectout)
+    if len(vectout) == len(vectin):
+        vectinout = copy.deepcopy(vectin)
+    else:
+        for cP in range(0,len(vectinout)):
+            if cP < len(vectin):
+                vectinout[cP] = vectin[cP]
+
+    return vectinout
+
+def rereference(EEG, OldReferenceLabel, ReferenceChannels, SkipChannels, Approach=False, Debug=False):
+    OUTEEG = copy.deepcopy(EEG)
+    Approach = checkdefaultsettings(Approach, ['median', 'mean'])
+    Waveform = None
+    
+    availablechannels = copy.deepcopy(EEG.channels)
+            
+    if Debug:
+        print('determining new reference waveform')
+    OldReference = []
+    # determine new reference waveform
+    if EEG.trials == 0:  
+        OldReference = [0]*EEG.pnts
+        Waveform = [[numpy.nan] * len(EEG.times)] * len(ReferenceChannels)
+        for cChan in range(len(ReferenceChannels)):
+            try:
+                matchindex = availablechannels.index(ReferenceChannels[cChan])
+            except:
+                matchindex = None
+            if matchindex != None:
+                Waveform[cChan] = EEG.data[matchindex]
+        Waveform = numpy.vstack(Waveform)
+        if Approach == 'mean':
+            Waveform = numpy.nanmean(Waveform, axis=0)
+        elif Approach == 'median':
+            Waveform = numpy.nanmedian(Waveform, axis=0)
+                
+    else:
+        Waveform = [[numpy.nan] * len(EEG.times)] * EEG.trials
+        for cE in range(EEG.trials):
+            OldReference.append([0]*EEG.pnts)
+            epochwaveform = [[numpy.nan] * len(EEG.times)] * len(ReferenceChannels)
+            for cChan in range(len(ReferenceChannels)):
+                try:
+                    matchindex = availablechannels.index(ReferenceChannels[cChan])
+                except:
+                    matchindex = None
+                if matchindex != None:
+                    epochwaveform[cChan] = EEG.data[matchindex][cE]   
+            epochwaveform = numpy.vstack(epochwaveform)
+            if Approach == 'mean':
+                epochwaveform = numpy.nanmean(epochwaveform, axis=0)
+            elif Approach == 'median':
+                epochwaveform = numpy.nanmedian(epochwaveform, axis=0)
+            Waveform[cE] = epochwaveform
+        
+    if Debug:
+        print('rereferencing')
+    # insert old reference data    
+    OUTEEG.channels.append(OldReferenceLabel)
+    OUTEEG.data.append(OldReference)
+    OUTEEG.nbchan = len(OUTEEG.data)
+    availablechannels = copy.deepcopy(OUTEEG.channels)
+    
+    if EEG.trials == 0:  
+        for cChan in range(len(availablechannels)):
+            try:
+                matchindex = SkipChannels.index(availablechannels[cChan])
+            except:
+                matchindex = None
+            if matchindex == None:
+                OUTEEG.data[cChan] = numpy.ndarray.tolist(numpy.subtract(OUTEEG.data[cChan], Waveform))
+    
+    else:
+        for cChan in range(len(availablechannels)):
+            try:
+                matchindex = SkipChannels.index(availablechannels[cChan])
+            except:
+                matchindex = None
+            if matchindex == None:
+                for cE in range(EEG.trials):
+                    OUTEEG.data[cChan][cE] = numpy.ndarray.tolist(numpy.subtract(OUTEEG.data[cChan][cE], Waveform[cE]))
+                    
+    return OUTEEG
+
+def subsetchannels(EEG, Channels):
+    OUTEEG = copy.deepcopy(EEG)
+    
+    newchannels = []
+    newdata = []
+    newfreqdata = []
+    for cchan in range(0, len(Channels)):
+        try:
+            indx = EEG.channels.index(Channels[cchan])
+        except:
+            indx = -1
+        if indx != -1:
+            newchannels.append(EEG.channels[indx])
+            newdata.append(EEG.data[indx])
+            if (EEG.freqdata != []):
+                newfreqdata.append(EEG.freqdata[indx])
+                
+    OUTEEG.channels = newchannels
+    OUTEEG.data = newdata
+    if (EEG.freqdata != []):
+        OUTEEG.freqdata = newfreqdata
+    OUTEEG.nbchan = int(len(OUTEEG.channels))
+    
+    OUTEEG.checkset()
+    
+    return OUTEEG
 
 def collapsechannels(EEG, Channels, NewChannelName=None, Approach=False):
     OUTEEG = copy.deepcopy(EEG)
@@ -1363,7 +2179,8 @@ def collapsechannels(EEG, Channels, NewChannelName=None, Approach=False):
             except:
                 matchindex = None
             if matchindex != None:
-                Waveform[cChan] = EEG.data[matchindex]
+                Waveform[cChan] = makeitfit(Waveform[cChan], EEG.data[matchindex])
+                
         Waveform = numpy.vstack(Waveform)
         if Approach == 'mean':
             Waveform = numpy.nanmean(Waveform, axis=0)
@@ -1380,7 +2197,7 @@ def collapsechannels(EEG, Channels, NewChannelName=None, Approach=False):
                 except:
                     matchindex = None
                 if matchindex != None:
-                    epochwaveform[cChan] = EEG.data[matchindex][cE]   
+                    epochwaveform[cChan] = makeitfit(epochwaveform[cChan], EEG.data[matchindex][cE])
             epochwaveform = numpy.vstack(epochwaveform)
             if Approach == 'mean':
                 epochwaveform = numpy.nanmean(epochwaveform, axis=0)
@@ -1671,7 +2488,8 @@ def simplefilter(EEG, Filter=False, Design=False, Cutoff=False, Order=False, Win
             if len(nans) > 0:
                 # restore missing data
                 filtdata[nans] = numpy.nan
-            OUTEEG.data[i] = copy.deepcopy(numpy.ndarray.tolist(filtdata))
+            #OUTEEG.data[i] = copy.deepcopy(numpy.ndarray.tolist(filtdata))
+            OUTEEG.data[i] = numpy.ndarray.tolist(filtdata)
      
             
     elif Design in ['savitzky-golay', 'savgol']:   
@@ -1704,7 +2522,8 @@ def simplefilter(EEG, Filter=False, Design=False, Cutoff=False, Order=False, Win
             if len(nans) > 0:
                 # restore missing data
                 filtdata[nans] = numpy.nan
-            OUTEEG.data[i] = copy.deepcopy(numpy.ndarray.tolist(filtdata))
+            #OUTEEG.data[i] = copy.deepcopy(numpy.ndarray.tolist(filtdata))
+            OUTEEG.data[i] = numpy.ndarray.tolist(filtdata)
         
         
     elif Design in ['hanning', 'flat', 'hamming', 'bartlett', 'blackman']:
@@ -1739,7 +2558,8 @@ def simplefilter(EEG, Filter=False, Design=False, Cutoff=False, Order=False, Win
                         filtdata[nans] = numpy.nan
                 except:
                     pass
-                OUTEEG.data[i] = copy.deepcopy(numpy.ndarray.tolist(filtdata))
+                #OUTEEG.data[i] = copy.deepcopy(numpy.ndarray.tolist(filtdata))
+                OUTEEG.data[i] = numpy.ndarray.tolist(filtdata)
                 
             elif OUTEEG.trials > 0:
                 currentchan = []
@@ -1766,7 +2586,9 @@ def simplefilter(EEG, Filter=False, Design=False, Cutoff=False, Order=False, Win
                         pass
                     currentchan.append(numpy.ndarray.tolist(filtdata))
                         
-                OUTEEG.data[i] = copy.deepcopy(currentchan)
+                #OUTEEG.data[i] = copy.deepcopy(currentchan)
+                OUTEEG.data[i] = currentchan.copy()
+                #OUTEEG.data[i] = currentchan
         
         
     return OUTEEG
@@ -1908,9 +2730,10 @@ def epochtocontinous(EEG, skipreject=True):
     return OUTEEG
 
 
-def simpleepoch(EEG, Window=False, Types=False):
+def simpleepoch(EEG, Window=False, Types=False, debug=False):
     # Convert a continuous EEG dataset to epoched data by extracting data time locked to specified event types.
-
+    if debug:
+        tstart = time.process_time()
     OUTEEG = copy.deepcopy(EEG)
     stimlistvalue = [v for i,v in enumerate(OUTEEG.events[0]) if v > 0]
     stimlistindex = [i for i,v in enumerate(OUTEEG.events[0]) if v > 0]
@@ -1921,11 +2744,19 @@ def simpleepoch(EEG, Window=False, Types=False):
 
     if Window != False:
         
+        if debug:
+            print ('Prep Time since start: %.1f sec' % (time.process_time()-tstart))
+            tseg = time.process_time()
+            
         # figure out how big the span needs to be
         epochsamples = int(numpy.floor(numpy.multiply(numpy.divide(numpy.subtract(float(Window[1]),float(Window[0])),float(1.0)),OUTEEG.srate)))
         OUTEEG.times = numpy.arange(numpy.divide(Window[0],1.0), numpy.divide(Window[1],1.0),numpy.divide(1.0,OUTEEG.srate))
         epochindexmin = numpy.multiply(numpy.divide(Window[0],1.0), OUTEEG.srate)
         
+        if debug:
+            print ('Span size Time since start: %.1f sec; Time since last seg: %.1f sec' % ((time.process_time()-tstart), (time.process_time()-tseg)))
+            tseg = time.process_time()
+            
         # epoch data
         epochs = []
         for cC in range(OUTEEG.nbchan):
@@ -1954,10 +2785,15 @@ def simpleepoch(EEG, Window=False, Types=False):
                     currentepoch.append(activeepoch)
                     
             epochs.append(currentepoch)
+        
+        if debug:
+            print ('Epoch Time since start: %.1f sec; Time since last seg: %.1f sec' % ((time.process_time()-tstart), (time.process_time()-tseg)))
+            tseg = time.process_time()
             
         # first index will correspond with channel
         # second index will correspond with epoch
-        OUTEEG.data = copy.deepcopy(epochs)
+        #OUTEEG.data = copy.deepcopy(epochs)
+        OUTEEG.data = epochs.copy()
             
         # epoch event codes
         events = []     
@@ -1988,8 +2824,12 @@ def simpleepoch(EEG, Window=False, Types=False):
                     
             events.append(currentepoch)
         OUTEEG.events = copy.deepcopy(events)
+        #OUTEEG.events = events.copy()
         
-        
+        if debug:
+            print ('Events Time since start: %.1f sec; Time since last seg: %.1f sec' % ((time.process_time()-tstart), (time.process_time()-tseg)))
+            tseg = time.process_time()
+            
         samples = []
         for cE in range(len(stimlistvalue)):
             # if the event code is in the list of types to epoch
@@ -2013,7 +2853,13 @@ def simpleepoch(EEG, Window=False, Types=False):
                 activeepoch[0+epochindexstartadj:epochsamples-epochindexstopadj] = OUTEEG.samples[epochindexstart:epochindexstop]
         
                 samples.append(activeepoch)
+                
+        if debug:
+            print ('Samples Time since start: %.1f sec; Time since last seg: %.1f sec' % ((time.process_time()-tstart), (time.process_time()-tseg)))
+            tseg = time.process_time()
+            
         OUTEEG.samples = copy.deepcopy(samples)
+        #OUTEEG.samples = samples.copy()
         OUTEEG.pnts = len(OUTEEG.times)
         OUTEEG.trials = len(samples)
         OUTEEG.reject = [0] * OUTEEG.trials
@@ -2027,6 +2873,30 @@ def simpleepoch(EEG, Window=False, Types=False):
 ################################################################################################################################################
 ################################################################################################################################################
 ################################################################################################################################################
+
+def rejectbytrialtype(EEG, TypestoReject=None, TypestoKeep=None):
+    OUTEEG = copy.deepcopy(EEG)
+    
+    if TypestoKeep != None:
+        for cE in range(len(TypestoKeep)):
+            TypestoKeep[cE] = float(TypestoKeep[cE])
+            
+    if TypestoReject != None:
+        for cE in range(len(TypestoReject)):
+            TypestoReject[cE] = float(TypestoReject[cE])
+    
+    for cE in range(EEG.trials):
+        if TypestoKeep != None:
+            if not float(EEG.events[0][cE][closestidx(EEG.times, 0)]) in TypestoKeep:
+                OUTEEG.reject[cE] = 9
+                
+        if TypestoReject != None:
+            if float(EEG.events[0][cE][closestidx(EEG.times, 0)]) in TypestoReject:
+                OUTEEG.reject[cE] = 9
+    
+    OUTEEG.acceptedtrials = len([v for i,v in enumerate(OUTEEG.reject) if v == 0])
+
+    return OUTEEG
 
 def netdeflectiondetection(EEG, Threshold=False, Direction=False, Window=False, Approach=False, Channel=False):
     # function to reject trials that have net activity beyond the specified level
@@ -3054,6 +3924,31 @@ def writeeegtofile(EEG, fileout):
         f.write('%s' % OUTEEG.channels[i])
         if (i < OUTEEG.nbchan-1): f.write(', ')
     f.write('\n')
+    
+    booltracker = False
+    try:
+        OUTEEG.eyetracking.distance
+        booltracker = True
+    except:
+        pass
+    if booltracker:
+        f.write('eyetrackingdistance = %f\n' % OUTEEG.eyetracking.distance)
+        f.write('eyetrackingaccuracyleftdegrees = %f\n' % OUTEEG.eyetracking.accuracyleftdegrees)
+        f.write('eyetrackingaccuracyleftpixels = %f\n' % OUTEEG.eyetracking.accuracyleftpixels)
+        f.write('eyetrackingprecisionleftpixels = %f\n' % OUTEEG.eyetracking.precisionleftpixels)
+        f.write('eyetrackingaccuracyrightdegrees = %f\n' % OUTEEG.eyetracking.accuracyrightdegrees)
+        f.write('eyetrackingaccuracyrightpixels = %f\n' % OUTEEG.eyetracking.accuracyrightpixels)
+        f.write('eyetrackingprecisionrightpixels = %f\n' % OUTEEG.eyetracking.precisionrightpixels)
+        
+    else:
+        f.write('eyetrackingdistance = %d\n')
+        f.write('eyetracking.accuracyleftdegrees = NaN\n')
+        f.write('eyetracking.accuracyleftpixels = NaN\n')
+        f.write('eyetracking.precisionleftpixels = NaN\n')
+        f.write('eyetracking.accuracyrightdegrees = NaN\n')
+        f.write('eyetracking.accuracyrightpixels = NaN\n')
+        f.write('eyetracking.precisionrightpixels = NaN\n')
+        
     f.write('points = %d\n' % OUTEEG.pnts)
     f.write('times = ')
     for i in range(OUTEEG.pnts):
@@ -3061,6 +3956,7 @@ def writeeegtofile(EEG, fileout):
         if (i < len(OUTEEG.times)-1): f.write(', ')
     f.write('\n')
     f.write('trials = %d\n' % OUTEEG.trials)
+    
     f.write('data:\n')
     f.write('Event, Time, Markers, Reject, ')
     for i in range(OUTEEG.nbchan):
@@ -3238,6 +4134,7 @@ class waveformplotprep():
         self.fillbetweencolor = 'k'
         self.fillbetweenopacity = 0.6
         self.fillwindow = None  
+        self.scale = None
         
 
 def wavesubplot(waves, scale=None, ax=None, colorscale=None, positivedown=False):
@@ -3263,16 +4160,25 @@ def wavesubplot(waves, scale=None, ax=None, colorscale=None, positivedown=False)
                     waves[cA].linecolor = segs[cA]
  
         
-        
     tempmin = waves[0].x[0]
     tempmax = waves[0].x[-1]
+    boolscale = False # assume user did not give a scale
     for cA in range(len(waves)):
         if waves[cA].x[0] < tempmin:
             tempmin = waves[cA].x[0]
         if waves[cA].x[-1] < tempmax:
             tempmax = waves[cA].x[-1]
-            
+        try:
+            tempv = len(waves[cA].scale) # will throw an error as nonetype has no length
+            scale = waves[cA].scale
+            boolscale = True
+        except:
+            pass
         
+    if not boolscale:
+      scale = [tempmin, tempmax]
+      scale = numpy.multiply(scale, 1.1)
+         
     #matplotlib.pyplot.sca(ax)
     ax.spines['top'].set_visible(False)
     ax.spines['bottom'].set_visible(True)
@@ -3327,11 +4233,8 @@ def wavesubplot(waves, scale=None, ax=None, colorscale=None, positivedown=False)
             
             ax.fill_between(waves[cA].x[winstart:winstop], waves[cA].y[winstart:winstop], ref[winstart:winstop], color=waves[cA].fillbetweencolor, alpha=waves[cA].fillbetweenopacity)
         
-        
-        
-        
-    if scale != None:
-        matplotlib.pyplot.ylim(scale)
+    
+    matplotlib.pyplot.ylim(scale)
     
     if positivedown:
         ax.invert_yaxis()
@@ -3479,41 +4382,63 @@ def reportingwindow(fig, eggs=None, waveforms=None, bars=None, alternatelabelsat
         # Egg head plots
         if eggs != None:
             
-            if tickvalues == None:
-                tickvalues = matplotlib.ticker.AutoLocator()
-        
-            # determine arrangement
-            nrow = 1;
-            ncol = 1;
-            if len(eggs) < 4:
-                ncol = len(eggs);
-            else:
-                nrow = int(numpy.ceil(numpy.divide(len(eggs),4)))
-                ncol = 4
-            
-            axfontsize=16
-            cmsizey=0.015
-            cmsizex=0.12
-            if ncol > 2:
-                axfontsize = axfontsize-3
-                cmsizey=0.01
-                cmsizex=0.10
-            
-            axhead = ax[0, 0].subgridspec(nrow, ncol, wspace=0.4, hspace=0.05)            
-            for cA in range(len(eggs)):
-                if eggs[cA].colormap == None:
-                    #eggs[cA].colormap = matplotlib.pyplot.cm.viridis
-                    eggs[cA].colormap = crushparula(256)
+            #
+            whatami = 'egg'
+            try:
+                tempval = eggs[0].opacity
+            except:
+                try:
+                    tempval = eggs[0].x
+                    whatami = 'wave'
+                except:
+                    try:
+                        tempval = eggs[0].biggerisbetter
+                        whatami = 'bar'
+                    except:
+                        whatami = 'nothing'
                 
-                axheadsub = fig.add_subplot(axhead[0, cA])  
                 
-                eggheadplot_sub(eggs[cA].channels, eggs[cA].amplitudes, axheadsub, Steps=eggs[cA].steps, Scale=eggs[cA].scale, Colormap=eggs[cA].colormap, BrainOpacity=eggs[cA].opacity)
-                axheadsub.set_title(eggs[cA].title + '\n', color='black', fontweight='bold', fontsize=axfontsize, ha='center', va='center')
+            if whatami == 'wave':
+                axegg = fig.add_subplot(ax[0, 0])
+                wavesubplot(eggs, waveformscale, ax=axegg, colorscale=None, positivedown=waveformpositivedown)
+                
+                
+            if whatami == 'egg':
+                if tickvalues == None:
+                    tickvalues = matplotlib.ticker.AutoLocator()
+            
+                # determine arrangement
+                nrow = 1;
+                ncol = 1;
+                if len(eggs) < 4:
+                    ncol = len(eggs);
+                else:
+                    nrow = int(numpy.ceil(numpy.divide(len(eggs),4)))
+                    ncol = 4
+                
+                axfontsize=16
+                cmsizey=0.015
+                cmsizex=0.12
+                if ncol > 2:
+                    axfontsize = axfontsize-3
+                    cmsizey=0.01
+                    cmsizex=0.10
+                
+                axhead = ax[0, 0].subgridspec(nrow, ncol, wspace=0.4, hspace=0.05)            
+                for cA in range(len(eggs)):
+                    if eggs[cA].colormap == None:
+                        #eggs[cA].colormap = matplotlib.pyplot.cm.viridis
+                        eggs[cA].colormap = crushparula(256)
                     
-                pos1 = axheadsub.get_position()
-                norm = matplotlib.colors.Normalize(vmin=eggs[cA].scale[0], vmax=eggs[cA].scale[1])
-                fig.colorbar(matplotlib.cm.ScalarMappable(cmap=eggs[cA].colormap, norm=norm), cax=fig.add_axes([pos1.x0+0.015, pos1.y0-0.05, cmsizex, cmsizey]), orientation='horizontal', ticks=matplotlib.ticker.AutoLocator())
-            
+                    axheadsub = fig.add_subplot(axhead[0, cA])  
+                    
+                    eggheadplot_sub(eggs[cA].channels, eggs[cA].amplitudes, axheadsub, Steps=eggs[cA].steps, Scale=eggs[cA].scale, Colormap=eggs[cA].colormap, BrainOpacity=eggs[cA].opacity)
+                    axheadsub.set_title(eggs[cA].title + '\n', color='black', fontweight='bold', fontsize=axfontsize, ha='center', va='center')
+                        
+                    pos1 = axheadsub.get_position()
+                    norm = matplotlib.colors.Normalize(vmin=eggs[cA].scale[0], vmax=eggs[cA].scale[1])
+                    fig.colorbar(matplotlib.cm.ScalarMappable(cmap=eggs[cA].colormap, norm=norm), cax=fig.add_axes([pos1.x0+0.015, pos1.y0-0.05, cmsizex, cmsizey]), orientation='horizontal', ticks=matplotlib.ticker.AutoLocator())
+                
         # Waveforms
         if waveforms != None:
             axwave = fig.add_subplot(ax[0, 1])
@@ -3601,12 +4526,16 @@ def ernpipe(EEG):
     
 # # # # #
 # DEBUG #
-if __name__ == "__main__":
+        
+    
+
+def testrun():
+
     
     demo = 'main'
     #demo = 'reporting'
-    demo = 'reportingeggs'
-    demo = 'reportingwaves'
+    #demo = 'reportingeggs'
+    #demo = 'reportingwaves'
     if demo == 'main':
         EEG = eeglabstructure()
         
@@ -3620,8 +4549,9 @@ if __name__ == "__main__":
         
         Channels = ['FPZ', 'F3', 'FZ', 'F4', 'T7', 'C3', 'CZ', 'C4', 'T8', 'P7', 'P3', 'PZ', 'P4', 'P8', 'OZ']
         Amplitude = [0, 3, 3, 1, 0, 7, 5, 4, 0, 2, 7, 8, 2, 2, 0]
-        eggheadplot(Channels, Amplitude, Scale = [1, 9], Steps = 256, BrainOpacity = 0.2, Title ='Egghead', Colormap=crushparula(256))
     
+        eggheadplot([Channels], [Amplitude], Steps=512, Scale = [1, 9], TickValues=False, Colormap=crushparula(256), 
+                    BrainOpacity = 0.2, Pad=False, Contours=True, Title =['Egghead'])
         
         [outsum, outvect, xtime] = createsignal(Window = [-0.1, 1.0],
                      Latency =   [ 0.08,  0.25, 0.35],
@@ -3822,3 +4752,97 @@ if __name__ == "__main__":
         
         reportingwindow(eggs=eggchunks, waveforms=wavechunks, bars=chunks, waveformscale = [-0.1, 0.75])
         
+        
+def purplecrush(mapsize=False, flip=False):
+    if mapsize == False:
+        mapsize = 256
+    if mapsize < 7:
+        mapsize = 7
+    segs = ['#F593FA', '#9F71E3', '#7729F0', '#350C8F','#23248F', '#1C2C75', '#00004B'] 
+    if flip:
+        segs.reverse()
+    newcmap = LinearSegmentedColormap.from_list("", segs, mapsize) 
+    return newcmap
+
+def blueburst(mapsize=False, flip=False):
+    if mapsize == False:
+        mapsize = 256
+    if mapsize < 9:
+        mapsize = 9
+    segs = ['#666C70', # darker gray
+            '#687178', # dark gray
+            '#687178', # dark gray
+            '#687178', # dark gray
+            '#B3B3B3', # 30%
+            '#D1D3D4', # light gray
+            '#09A0FF', # medium blue
+            '#06BBFF', # medium blue
+            '#00FFFF'] # light blue
+    if flip:
+        segs.reverse()
+    newcmap = LinearSegmentedColormap.from_list("", segs, mapsize) 
+    return newcmap
+
+def orangeburst(mapsize=False, flip=False):
+    if mapsize == False:
+        mapsize = 256
+    if mapsize < 9:
+        mapsize = 9
+    segs = ['#666C70', # darker gray
+            '#687178', # dark gray
+            '#687178', # dark gray
+            '#687178', # dark gray
+            '#B3B3B3', # 30%
+            '#D1D3D4', # light gray
+            '#f65f00', # medium orange
+            '#f94400', # medium orange
+            '#ff0000'] # light red
+    if flip:
+        segs.reverse()
+    newcmap = LinearSegmentedColormap.from_list("", segs, mapsize) 
+    
+    return newcmap
+        
+def blueband(mapsize=False, flip=False):
+    if mapsize == False:
+        mapsize = 256
+    if mapsize < 7:
+        mapsize = 7
+    segs = ['#666C70', # darker gray
+            '#687178', # dark gray
+            '#687178', # dark gray
+            '#B3B3B3', # 30%
+            '#D1D3D4', # light gray
+            '#1292c5', # lighter blue
+            '#0d6f96'] # blue
+    if flip:
+        segs.reverse()
+    newcmap = LinearSegmentedColormap.from_list("", segs, mapsize) 
+    return newcmap
+def orangeband(mapsize=False, flip=False):
+    if mapsize == False:
+        mapsize = 256
+    if mapsize < 7:
+        mapsize = 7
+    segs = ['#666C70', # darker gray
+            '#687178', # dark gray
+            '#687178', # dark gray
+            '#B3B3B3', # 30%
+            '#D1D3D4', # light gray
+            '#f29069', # lighter orange
+            '#ed6d3a'] # orange
+    if flip:
+        segs.reverse()
+    newcmap = LinearSegmentedColormap.from_list("", segs, mapsize) 
+    return newcmap
+
+if __name__ == "__main__":
+        
+        Channels = ['FPZ', 'F3', 'FZ', 'F4', 'T7', 'C3', 'CZ', 'C4', 'T8', 'P7', 'P3', 'PZ', 'P4', 'P8', 'OZ']
+        Amplitude = [0, 3, 3, 1, 0, 7, 5, 4, 0, 2, 7, 8, 2, 2, 0]
+        
+        eggheadplot([Channels], [Amplitude], Steps=512, Scale = [1, 9], TickValues=False, Colormap=blueband(512), 
+                    BrainOpacity = 0.2, Pad=True, Contours=False, Title =['Egghead'], debug=False)
+    
+    
+    
