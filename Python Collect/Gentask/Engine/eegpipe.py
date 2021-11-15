@@ -4160,14 +4160,14 @@ def wavesubplot(waves, scale=None, ax=None, colorscale=None, positivedown=False)
                     waves[cA].linecolor = segs[cA]
  
         
-    tempmin = waves[0].x[0]
-    tempmax = waves[0].x[-1]
+    tempmin = min(waves[0].y)
+    tempmax = max(waves[0].y)
     boolscale = False # assume user did not give a scale
     for cA in range(len(waves)):
-        if waves[cA].x[0] < tempmin:
-            tempmin = waves[cA].x[0]
-        if waves[cA].x[-1] < tempmax:
-            tempmax = waves[cA].x[-1]
+        if min(waves[cA].y) < tempmin:
+            tempmin = min(waves[cA].y)
+        if max(waves[cA].y) > tempmax:
+            tempmax = max(waves[cA].y)
         try:
             tempv = len(waves[cA].scale) # will throw an error as nonetype has no length
             scale = waves[cA].scale
