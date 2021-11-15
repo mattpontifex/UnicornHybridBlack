@@ -15,7 +15,10 @@ import time
 from datetime import datetime
 import csv
 import numpy
-
+try:
+    os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
+except:
+    pass
 from psychopy import prefs
 from psychopy import visual, core, event, gui
 try:
@@ -43,7 +46,6 @@ import warnings
 warnings.simplefilter('ignore')
 from psychopy import logging
 logging.console.setLevel(logging.CRITICAL)
-
 
 
 

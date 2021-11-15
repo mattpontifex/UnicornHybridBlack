@@ -713,7 +713,7 @@ def checkflankerperf(task, show=True):
             EEGresp = eegpipe.simpleepoch(EEG, Window = [-0.500, 1.000], Types = [51, 10051])
             EEGresp = eegpipe.simplebaselinecorrect(EEGresp, Window = [-0.500, -0.200])
             EEGresp = eegpipe.ernpipe(EEGresp)
-            if EEGresp.acceptedtrials > 4:
+            if EEGresp.acceptedtrials > 2:
                 EEGresp = eegpipe.simpleaverage(EEGresp, Approach = 'Mean')
                 EEGresp = eegpipe.collapsechannels(EEGresp, Channels = ['FZ', 'FC1', 'FC2', 'CZ'], NewChannelName='HOTSPOT', Approach='median')
                 EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 4)
@@ -986,7 +986,7 @@ def checkn2backperf(task, show=True):
             EEGresp = eegpipe.simpleepoch(EEG, Window = [-0.500, 1.000], Types = [51, 10051])
             EEGresp = eegpipe.simplebaselinecorrect(EEGresp, Window = [-0.500, -0.200])
             EEGresp = eegpipe.ernpipe(EEGresp)
-            if EEGresp.acceptedtrials > 4:
+            if EEGresp.acceptedtrials > 2:
                 EEGresp = eegpipe.simpleaverage(EEGresp, Approach = 'Mean')
                 EEGresp = eegpipe.collapsechannels(EEGresp, Channels = ['FZ', 'FC1', 'FC2', 'CZ'], NewChannelName='HOTSPOT', Approach='median')
                 EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 4)
@@ -1133,7 +1133,7 @@ def checkcontinousn2backperf(task, show=True):
             EEGresp = eegpipe.simpleepoch(EEG, Window = [-0.500, 1.000], Types = [51, 10051])
             EEGresp = eegpipe.simplebaselinecorrect(EEGresp, Window = [-0.500, -0.200])
             EEGresp = eegpipe.ernpipe(EEGresp)
-            if EEGresp.acceptedtrials > 4:
+            if EEGresp.acceptedtrials > 2:
                 EEGresp = eegpipe.simpleaverage(EEGresp, Approach = 'Mean')
                 EEGresp = eegpipe.collapsechannels(EEGresp, Channels = ['FZ', 'FC1', 'FC2', 'CZ'], NewChannelName='HOTSPOT', Approach='median')
                 EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 4)
