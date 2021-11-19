@@ -44,6 +44,7 @@ class Viewer():
         self.channellabels = self.unicornchannels.split(',')[0:int(self.numberOfAcquiredChannels)]
         self.updatetime = 200 # update every x ms
         self.updatetimelog = []
+        self._stop = False
 
         self._linewidth = 0.5
         self._data = []
@@ -295,28 +296,29 @@ class Viewer():
             
             
     def updatescale(self):
-        # update scale
-        self.computedscale = ((self.offset[1]-self.offset[0]) / self.timeplotscale)
-        textscale = self.computedscale
-        
-        textscaleunits = 'microvolts'
-        if (textscale > 1000):
-            textscaleunits = 'millivolts'
-            textscale = textscale/1000
+        if not self._stop:
+            # update scale
+            self.computedscale = ((self.offset[1]-self.offset[0]) / self.timeplotscale)
+            textscale = self.computedscale
+            
+            textscaleunits = 'microvolts'
             if (textscale > 1000):
-                textscaleunits = 'volts'
+                textscaleunits = 'millivolts'
                 textscale = textscale/1000
-        elif (textscale < 1000):
-            if (textscale < 1):
-                textscaleunits = 'nanovolts'
-                textscale = textscale*1000
+                if (textscale > 1000):
+                    textscaleunits = 'volts'
+                    textscale = textscale/1000
+            elif (textscale < 1000):
                 if (textscale < 1):
-                    textscaleunits = 'picovolts'
+                    textscaleunits = 'nanovolts'
                     textscale = textscale*1000
-                   
-        self.timescalelabel.set_text('%d %s' % (int(textscale),textscaleunits))
-        self.fig.canvas.draw_idle()
-        #print(numpy.median(self.updatetimelog))
+                    if (textscale < 1):
+                        textscaleunits = 'picovolts'
+                        textscale = textscale*1000
+                       
+            self.timescalelabel.set_text('%d %s' % (int(textscale),textscaleunits))
+            self.fig.canvas.draw_idle()
+            #print(numpy.median(self.updatetimelog))
         
         
     def _computedataoffset(self, source):
@@ -339,60 +341,82 @@ class Viewer():
         self.prep()
         self.updatescale()
         
-        print('Close window to disconnect...')
-        ani = matplotlib.animation.FuncAnimation(self.fig, self.update, interval=self.updatetime, blit=False)
+        #print('Close window to disconnect...')
+        self.ani = matplotlib.animation.FuncAnimation(self.fig, self.update, interval=self.updatetime, blit=False)
         matplotlib.pyplot.show()
         
+    def close(self):
+        try:
+            self.ani.event_source.stop()
+        except:
+            pass
+        try:
+            matplotlib.pyplot.close('all')
+        except:
+            pass
+        try:
+            self.UnicornBlack.p.terminate()
+        except:
+            pass
+        try:
+            self.UnicornBlack.p.join()
+        except:
+            pass
+        try:
+            # stop recording
+            self.UnicornBlack.disconnect()
+        except:
+            pass
+        
     def handle_close(self, evt, *args):
-        #print('Shutting down data viewer...')
-        #matplotlib.pyplot.close()
-        #self.UnicornBlack.disconnect()
-        bolerr = 1 
+        self.fig.canvas.manager.window.destroy()
+        self._stop = True
+        self.close()
         
         
     def update(self, *args):
-        
-        threspoints = [12, 16, 30, 60]
-        self.freqax.collections.clear()
-        self.freqfillbetween = []
-
-        self.updatesamples()
-        
-        boolcont = True
-        try:
-            self.batterylabel.set_text('Battery: %d%%' % self.powerlevel)
-        except:
-            boolcont = False
+        if not self._stop:
+            threspoints = [12, 16, 30, 60]
+            self.freqax.collections.clear()
+            self.freqfillbetween = []
+    
+            self.updatesamples()
             
-        if boolcont:
-            # takes about 8 ms to update all the channels info
-            
-            # loop through each channel
-            for cP in range(self.numberOfAcquiredChannels):
-                try:
-                    datavector = self.datamatrixforplotting[:,cP]
-                    pstd = self.datacheck.pointstd[cP]
-                    if (pstd < threspoints[0]):
-                        newtexture = self.greatchannel
-                    elif ((pstd >= threspoints[0]) and (pstd < threspoints[1])):
-                        newtexture = self.goodchannel
-                    elif ((pstd >= threspoints[1]) and (pstd < threspoints[2])):
-                        newtexture = self.almostchannel
-                    elif ((pstd >= threspoints[2]) and (pstd < threspoints[3])):
-                        newtexture = self.gettingtherechannel
-                    else:
-                        newtexture = self.badchannel
-                    self.chanlables[self.numberOfAcquiredChannels-1-cP].set_bbox(dict(facecolor=newtexture, edgecolor=newtexture, boxstyle='square,pad=1.83'))
-                except:
-                    #print('error in time plot')
-                    pass                    
-                try:
-                    self.lines[cP].set_ydata(datavector)
-                    self.freqlines[cP].set_ydata(self.frequencymatrixforplotting[:,cP])
-                    self.freqfillbetween.append(self.freqax.fill_between(self.freqxline, y1=self.frequencymatrixforplotting[:,cP], y2=[self.freqoffset[cP]] * len(self.frequencymatrixforplotting[:,cP]), facecolor =self.colorpalet[cP], alpha=0.5))
-                except:
-                    #print('error in freq plot')
-                    pass  
+            boolcont = True
+            try:
+                self.batterylabel.set_text('Battery: %d%%' % self.powerlevel)
+            except:
+                boolcont = False
+                
+            if boolcont:
+                # takes about 8 ms to update all the channels info
+                
+                # loop through each channel
+                for cP in range(self.numberOfAcquiredChannels):
+                    try:
+                        datavector = self.datamatrixforplotting[:,cP]
+                        pstd = self.datacheck.pointstd[cP]
+                        if (pstd < threspoints[0]):
+                            newtexture = self.greatchannel
+                        elif ((pstd >= threspoints[0]) and (pstd < threspoints[1])):
+                            newtexture = self.goodchannel
+                        elif ((pstd >= threspoints[1]) and (pstd < threspoints[2])):
+                            newtexture = self.almostchannel
+                        elif ((pstd >= threspoints[2]) and (pstd < threspoints[3])):
+                            newtexture = self.gettingtherechannel
+                        else:
+                            newtexture = self.badchannel
+                        self.chanlables[self.numberOfAcquiredChannels-1-cP].set_bbox(dict(facecolor=newtexture, edgecolor=newtexture, boxstyle='square,pad=1.83'))
+                    except:
+                        #print('error in time plot')
+                        pass                    
+                    try:
+                        self.lines[cP].set_ydata(datavector)
+                        self.freqlines[cP].set_ydata(self.frequencymatrixforplotting[:,cP])
+                        self.freqfillbetween.append(self.freqax.fill_between(self.freqxline, y1=self.frequencymatrixforplotting[:,cP], y2=[self.freqoffset[cP]] * len(self.frequencymatrixforplotting[:,cP]), facecolor =self.colorpalet[cP], alpha=0.5))
+                    except:
+                        #print('error in freq plot')
+                        pass  
             
         return self.batterylabel, self.chanlables[0], self.chanlables[1], self.chanlables[2], self.chanlables[3], self.chanlables[4], self.chanlables[5], self.chanlables[6], self.chanlables[7], self.lines[0], self.lines[1], self.lines[2], self.lines[3], self.lines[4], self.lines[5], self.lines[6], self.lines[7]
             
@@ -405,43 +429,43 @@ class Viewer():
         #while self._sampling:
             
         #t = time.perf_counter()
-        
-        boolcont = True
-        try:
-            _plottingdata = numpy.array(self.UnicornBlack.sample_data(), copy=True)
-        except:
-            boolcont = False
-        
-        if boolcont:    
+        if not self._stop:
+            boolcont = True
             try:
-                self.powerlevel = int(_plottingdata[-1,-3])
-            
-               
-                self.datacheck.data = _plottingdata
-                self.datacheck.check()
-                
-                _plottingdata = numpy.array(self.datacheck.filtereddata, copy=True)
-                if not (float(self.trimspan) == float(0)):
-                    _plottingdata = _plottingdata[:,self._trimspantrailpoints:-self._trimspanleadpoints]
-                    
-                _plottingdata[0:8,:] = numpy.flipud(_plottingdata[0:8,:])
-                _plottingdata = self._computedataoffset(_plottingdata)
-
-                self.datamatrixforplotting = _plottingdata[:]
-                
-                # manage frequency data
-                _freqdatanoise = numpy.array(self.datacheck.psddata, copy=True)
-                _freqdata = numpy.array(self.datacheck.psdclean, copy=True)
-                # remove frequency bands not of interest - swap noise measure in
-                _freqdata[:,self.switchsegs[0]:self.switchsegs[1]] = _freqdatanoise[:,self.switchsegs[2]:self.switchsegs[3]]
-                _freqdata[0:8,:] = numpy.flipud(_freqdata[0:8,:])
-                _freqdata = self._computefreqoffset(_freqdata)
-                
-                self.frequencymatrixforplotting = _freqdata[:]
-                
+                _plottingdata = numpy.array(self.UnicornBlack.sample_data(), copy=True)
             except:
                 boolcont = False
-        
+            
+            if boolcont:    
+                try:
+                    self.powerlevel = int(_plottingdata[-1,-3])
+                
+                   
+                    self.datacheck.data = _plottingdata
+                    self.datacheck.check()
+                    
+                    _plottingdata = numpy.array(self.datacheck.filtereddata, copy=True)
+                    if not (float(self.trimspan) == float(0)):
+                        _plottingdata = _plottingdata[:,self._trimspantrailpoints:-self._trimspanleadpoints]
+                        
+                    _plottingdata[0:8,:] = numpy.flipud(_plottingdata[0:8,:])
+                    _plottingdata = self._computedataoffset(_plottingdata)
+    
+                    self.datamatrixforplotting = _plottingdata[:]
+                    
+                    # manage frequency data
+                    _freqdatanoise = numpy.array(self.datacheck.psddata, copy=True)
+                    _freqdata = numpy.array(self.datacheck.psdclean, copy=True)
+                    # remove frequency bands not of interest - swap noise measure in
+                    _freqdata[:,self.switchsegs[0]:self.switchsegs[1]] = _freqdatanoise[:,self.switchsegs[2]:self.switchsegs[3]]
+                    _freqdata[0:8,:] = numpy.flipud(_freqdata[0:8,:])
+                    _freqdata = self._computefreqoffset(_freqdata)
+                    
+                    self.frequencymatrixforplotting = _freqdata[:]
+                    
+                except:
+                    boolcont = False
+            
         
         #elapsed_time = time.perf_counter() - t
         #self.updatetimelog.append(elapsed_time)
