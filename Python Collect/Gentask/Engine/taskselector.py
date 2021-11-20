@@ -40,13 +40,13 @@ class selectscreen():
         self.window.destroy()
     
     def buttonhit(self, buttoncall): 
-        print(buttoncall)
-        #self.close()
-        #try:
-        #    output = subprocess.call(['python', buttoncall])
-        #except:
-        #    os.chdir(os.path.dirname(os.getcwd()))
-        #    output = subprocess.call(['python', buttoncall])
+        #print(buttoncall)
+        self.close()
+        try:
+            output = subprocess.call(['python', buttoncall])
+        except:
+            os.chdir(os.path.dirname(os.getcwd()))
+            output = subprocess.call(['python', buttoncall])
             
     def show(self):
         
