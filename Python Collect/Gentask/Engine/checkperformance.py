@@ -31,7 +31,10 @@ from alive_progress.animations.spinners import alongside_spinner_factory, scroll
 
 #https://github.com/rsalmei/alive-progress
 #pip install alive-progress
-
+try:
+    os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
+except:
+    pass
 
 def performancereporter(task):
     gc.collect()

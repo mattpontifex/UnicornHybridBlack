@@ -1,9 +1,14 @@
 import tkinter    # from tkinter import Tk for Python 3.x
 import tkinter.ttk 
+from PIL import ImageTk 
 import numpy
 from sys import platform
 import os
 import subprocess
+try:
+    os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
+except:
+    pass
 
 def centerprompt(toplevel):
     toplevel.update_idletasks()
@@ -20,104 +25,152 @@ def centerprompt(toplevel):
     
     return [x, y]      
 
-
+        
 class selectscreen():
     
     def __init__(self):
+        self.controls = []
+        self.tasks = []
+        self.taskaltlabels = []
         self._close = False
+        
+    def close(self):
+        self._close = True
+        self.window.destroy()
     
+    def buttonhit(self, buttoncall): 
+        self.close()
+        try:
+            output = subprocess.call(['python', buttoncall])
+        except:
+            os.chdir(os.path.dirname(os.getcwd()))
+            output = subprocess.call(['python', buttoncall])
+            
     def show(self):
+        
         # creating tkinter window
         self.window = tkinter.Tk()
         self.window.lift()
         self.window.wm_attributes('-topmost',1)
         self.window.title('Unicorn Hybrid Black Task Selector')
-        self.winsize = [400, 300]
+        self.winsize = [900, 550]
+        self.window.geometry("%dx%d+0+0" % (self.winsize[0], self.winsize[1]))
+        self.window.resizable(width=False,height=False)
         
-        #self.window.attributes("-fullscreen", 1)
-    
-        #TK approach is to create then place
-        headerpadwin = tkinter.Frame(master=self.window, width=self.winsize[0], height=numpy.multiply(self.winsize[1],0.1), bg="white")
-        headerwin = tkinter.Frame(master=self.window, width=self.winsize[0], height=numpy.multiply(self.winsize[1],0.1), bg="white")
-        mainwin = tkinter.Frame(master=self.window, width=self.winsize[0], height=numpy.multiply(self.winsize[1],0.1), bg="white")
-        footerwin = tkinter.Frame(master=self.window, width=self.winsize[0], height=numpy.multiply(self.winsize[1],0.1), bg="white")
-        footerpadwin = tkinter.Frame(master=self.window, width=self.winsize[0], height=numpy.multiply(self.winsize[1],0.1), bg="white")
+        self.wsX = self.winsize[0]
+        self.wsY = self.winsize[1]
+        self.wsPad = [3, 3]
+        self.fontsize = 15
         
-        frame = tkinter.Frame(self.window, bg="white", borderwidth=0, highlightthickness=0)
-        if platform == "linux" or platform == "linux2" or platform == "darwin":
-            # OS X
-            self.canvas = tkinter.Canvas(frame, bg="white", width=self.winsize[0], height=numpy.multiply(self.winsize[1],0.7),borderwidth=0, highlightthickness=0)
-        elif platform == "win32":
-            self.canvas = tkinter.Canvas(frame, bg="white", width=self.winsize[0]*1.1, height=numpy.multiply(self.winsize[1],0.7),borderwidth=0, highlightthickness=0)
+        # note design
+        # two column (40 60 split)
+        # Column 0: 3 rows
+        # Column 1: X rows
         
-        headerpadwintext = tkinter.Label(master=headerwin, text='', fg='gray', font=(None, 5), bg="white",
-                                 justify='center', anchor='center', 
-                                 width=int(numpy.multiply(self.winsize[0],0.9)))
+        leftframe = tkinter.Frame(master = self.window, height=self.wsY, width=numpy.multiply(self.wsX,0.35), bg="white")
+        leftframe.pack(side='left', fill = 'both')
+        leftframe.pack_propagate(0)
         
-        headerwinbutton = tkinter.Button(master=headerwin, text='Check Signal from Unicorn Hybrid Black', font=(None, 25), 
-                                 justify='center', anchor='center', bd = 0,
-                                 fg='#FFFFFF', bg="#3D5E73",
-                                 activeforeground='#FFFFFF', activebackground='#004F39',
-                                 width=int(numpy.multiply(self.winsize[0],0.05)),
-                                 relief='flat', underline=-1, 
-                                 command=self.headerwinbuttonhit)
+        self.wsPad = [3, 3]
+        wsYsub = [0,0,0]
+        wsYsub[0] = numpy.multiply(self.wsY,0.2)
+        wsYsub[1] = numpy.multiply(self.wsY,0.4)
+        wsYsub[2] = numpy.multiply(self.wsY,0.4)
+        wsYpack = ['bottom'] * 3
+        wsYpack[1] = 'top'
+        leftframesub = []
+        for cR in range(3):
+            temp = tkinter.Frame(master = leftframe, height=wsYsub[cR], bg="white")
+            temp.pack(side=wsYpack[cR], fill = 'x', padx=self.wsPad[0], pady=self.wsPad[1])
+            temp.pack_propagate(0)
+            leftframesub.append(temp)
         
         
-        footerwinbutton = tkinter.Button(master=footerwin, text='Recheck Task Performance', font=(None, 15), 
-                                 justify='center', anchor='center', bd = 0,
-                                 fg='#FFFFFF', bg="#3D5E73",
-                                 activeforeground='#FFFFFF', activebackground='#004F39',
-                                 width=int(numpy.multiply(self.winsize[0],0.05)),
-                                 relief='flat', underline=-1, 
-                                 command=self.footerwinbuttonhit)
         
-        # place
-        placen = 0
-        headerpadwintext.grid(row=placen, column=0, sticky="nsew")
-        headerpadwin.grid(row=placen, column=0, sticky="nsew"); placen = placen + 1
-        self.window.rowconfigure(0, weight=0, minsize=numpy.multiply(self.winsize[1],0.05))
+        canvas = tkinter.Canvas(leftframesub[1], bg="white", borderwidth=0, highlightthickness=0)
+        canvas.pack(side='bottom', fill = 'x')
+        canvas.pack_propagate(0)
+        photoimage = []
+        try:
+            photoimage = ImageTk.PhotoImage(file="eggheadframe1.png")
+        except:
+            try:
+                photoimage = ImageTk.PhotoImage(file="Engine" + os.path.sep + "eggheadframe1.png")
+            except:
+                photoimage = ImageTk.PhotoImage(file="Gentask" + os.path.sep + "Engine" + os.path.sep + "eggheadframe1.png")
         
-        headerwinbutton.grid(row=placen, column=0, sticky="nsew")
-        headerwin.grid(row=placen, column=0, sticky="nsew"); placen = placen + 1
-        self.window.rowconfigure(0, weight=0, minsize=numpy.multiply(self.winsize[1],0.15))
+        canvas.create_image(150, 50, image=photoimage, anchor="n")
         
-        mainwin.grid(row=placen, column=0, sticky="nsew"); placen = placen + 1
-        self.window.rowconfigure(0, weight=0, minsize=numpy.multiply(self.winsize[1],0.6))
         
-        footerwinbutton.grid(row=placen, column=0, sticky="nsew")
-        footerwin.grid(row=placen, column=0, sticky="nsew"); placen = placen + 1
-        self.window.rowconfigure(0, weight=0, minsize=numpy.multiply(self.winsize[1],0.15))
+        leftbuttons = []
+        temp = tkinter.Button(master=leftframesub[2], text='Check EEG Signal', font=(None, self.fontsize), 
+                             justify='center', anchor='center', bd = 0,
+                             fg='#4A4A4A', bg="#D4D4D4",
+                             activeforeground='#FFFFFF', activebackground='#3D5E73',
+                             relief='flat', underline=-1, 
+                             command=lambda: self.buttonhit(self.controls[0]))
+        temp.pack(side='top', fill = 'x', padx=self.wsPad[0], pady=self.wsPad[1], ipady=numpy.multiply(self.fontsize, 0.7))
+        temp.pack_propagate(0)
+        leftbuttons.append(temp)
         
-        footerpadwin.grid(row=placen, column=0, sticky="nsew"); placen = placen + 1
-        self.window.rowconfigure(0, weight=0, minsize=numpy.multiply(self.winsize[1],0.05))
+        
+        temp = tkinter.Button(master=leftframesub[0], text='Recheck Task Performance', font=(None, int(numpy.multiply(self.fontsize,0.8))), 
+                             justify='center', anchor='center', bd = 0,
+                             fg='#4A4A4A', bg="#D4D4D4",
+                             activeforeground='#FFFFFF', activebackground='#3D5E73',
+                             relief='flat', underline=-1,
+                             command=lambda: self.buttonhit(self.controls[1]))
+        temp.pack(side='bottom', fill = 'x', padx=self.wsPad[0], pady=self.wsPad[1], ipady=numpy.multiply(self.fontsize, 0.7))
+        temp.pack_propagate(0)
+        leftbuttons.append(temp)
+        
+        
+        
+        
+        rightframe = tkinter.Frame(master = self.window, height=self.wsY, width=numpy.multiply(self.wsX,0.65), bg="white")
+        rightframe.pack(side='left', fill = 'both')
+        rightframe.pack_propagate(0)
+        
+        self.wsPad = [6, 6]
+        if len(self.tasks) > 0:
+            
+            if len(self.taskaltlabels) == 0:
+                for cR in range(len(self.tasks)):
+                    self.taskaltlabels.append(self.tasks[cR])
+            
+            wsYsub = [numpy.divide(self.wsY, (len(self.tasks)+1))] * (len(self.tasks)+1)
+            wsYsub[0] = numpy.multiply(self.wsY,0.1)
+            rightframesub = []
+            for cR in range(len(self.tasks)+1):
+                temp = tkinter.Frame(master = rightframe, height=wsYsub[cR], bg="white")
+                temp.pack(side='top', fill = 'x', padx=self.wsPad[0], pady=self.wsPad[1])
+                temp.pack_propagate(0)
+                rightframesub.append(temp)
+            
+            rightframewintext = tkinter.Label(master=rightframesub[0], text='Available Tasks:', font=(None, self.fontsize), justify='left', anchor='w', 
+                                              fg='#000000', bg="white")
+            rightframewintext.pack(side='top', fill = 'x', padx=numpy.multiply(self.wsPad[0],5), pady=self.wsPad[1])
+        
+            rightbuttons = []
+            for cR in range(1, len(self.tasks)+1):
+                temp = tkinter.Button(master=rightframesub[cR], text=self.taskaltlabels[cR-1], font=(None, self.fontsize), 
+                             justify='center', anchor='center', bd = 0,
+                             fg='#4A4A4A', bg="#D4D4D4",
+                             activeforeground='#FFFFFF', activebackground='#3D5E73',
+                             relief='flat', underline=-1, 
+                             command=lambda: self.buttonhit(self.tasks[cR-1]))
+                temp.pack(side='top', fill = 'x', padx=numpy.multiply(self.wsPad[0],10.0), pady=self.wsPad[1], ipady=numpy.multiply(self.fontsize, 0.7))
+                temp.pack_propagate(0)
+                rightbuttons.append(temp)
         
         [x, y] = centerprompt(self.window)
         self.window.geometry("+%d+%d" % (x, y))
-        
         self.window.mainloop()
-        
-    def headerwinbuttonhit(self): 
-        self.close()
-        try:
-            output = subprocess.call(['python', '1_CheckSignal.py'])
-        except:
-            os.chdir(os.path.dirname(os.getcwd()))
-            output = subprocess.call(['python', '1_CheckSignal.py'])
-    
-
-    def footerwinbuttonhit(self): 
-        self.close()
-        try:
-            output = subprocess.call(['python', '2_CheckPerformance.py'])
-        except:
-            os.chdir(os.path.dirname(os.getcwd()))
-            output = subprocess.call(['python', '2_CheckPerformance.py'])
-            
-    def close(self):
-        self._close = True
-        self.window.destroy()
         
 if __name__ == "__main__":
 
     task = selectscreen()
+    task.controls = ['1_CheckSignal.py', '2_CheckPerformance.py']
+    task.tasks = ['FlankerTask.py', 'OddballTask.py', 'NbackTask_2back.py', 'ContinuousNbackTask_2back.py']
+    task.taskaltlabels = ['Flanker Arrow Task', 'Oddball Detection Task', '2 Back Task', 'Continuous 2 Back Task']
     task.show()
