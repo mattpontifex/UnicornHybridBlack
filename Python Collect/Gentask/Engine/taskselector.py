@@ -40,12 +40,13 @@ class selectscreen():
         self.window.destroy()
     
     def buttonhit(self, buttoncall): 
-        self.close()
-        try:
-            output = subprocess.call(['python', buttoncall])
-        except:
-            os.chdir(os.path.dirname(os.getcwd()))
-            output = subprocess.call(['python', buttoncall])
+        print(buttoncall)
+        #self.close()
+        #try:
+        #    output = subprocess.call(['python', buttoncall])
+        #except:
+        #    os.chdir(os.path.dirname(os.getcwd()))
+        #    output = subprocess.call(['python', buttoncall])
             
     def show(self):
         
@@ -125,6 +126,7 @@ class selectscreen():
         leftbuttons.append(temp)
         
         
+        
         temp = tkinter.Button(master=leftframesub[0], text='Recheck Task Performance', font=(None, int(numpy.multiply(self.fontsize,0.8))), 
                              justify='center', anchor='center', bd = buttonstyle[1],
                              fg=leftbuttoncolors[0], bg=leftbuttoncolors[1],
@@ -169,7 +171,7 @@ class selectscreen():
                              fg=rightbuttoncolors[0], bg=rightbuttoncolors[1],
                              activeforeground=rightbuttoncolors[2], activebackground=rightbuttoncolors[3],
                              relief=buttonstyle[0], underline=-1, 
-                             command=lambda: self.buttonhit(self.tasks[cR-1]))
+                             command=lambda port = self.tasks[cR-1]: self.buttonhit(port))
                 temp.pack(side='top', fill = 'x', padx=numpy.multiply(self.wsPad[0],10.0), pady=self.wsPad[1], ipady=numpy.multiply(self.fontsize, 0.7))
                 temp.pack_propagate(0)
                 rightbuttons.append(temp)
