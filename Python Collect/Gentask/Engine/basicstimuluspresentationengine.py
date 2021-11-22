@@ -11,6 +11,7 @@ Follows traditional stim on, stim off, ITI/ISI format
 #
 
 import os #handy system and path functions
+import re
 import time
 from datetime import datetime
 import csv
@@ -49,6 +50,8 @@ logging.console.setLevel(logging.CRITICAL)
 
 
 
+def closestidx(lst, K):
+    return numpy.argmin(abs(numpy.subtract(lst, K)))
 
 
 class MonitorParameters():
@@ -137,6 +140,7 @@ class Engine():
         self.previoustrialforexperimentermarker = [0,0,0,0]
         self.printoutput = False
         
+        self.participantprogressnotice = False
         self.participantwinActive = False
         self.finished = False
         
@@ -171,6 +175,13 @@ class Engine():
             dlg.addText('')
             dlg.show()
             if dlg.OK==False: self.quit = True #user pressed cancel
+            if ' ' in dlg.data[0]:
+                dlg.data[0].replace(" ", "")
+            try:
+                tmp = re.sub(r"[^a-zA-Z0-9]","",dlg.data[0])
+                dlg.data[0] = tmp
+            except:
+                pass
             self.filename = '%s' %( dlg.data[0])
             #Determine if file already exists if so append '_1' to it
             while (os.path.isfile(self.folders.outputfolder + os.path.sep + self.prefix + self.filename + self.suffix + '.psydat')): 
@@ -207,7 +218,9 @@ class Engine():
                 self.experimenternotificationtext.setAutoDraw(True); self.experimenterwin.flip()
             
             
-            
+            if self.participantprogressnotice:
+                self.participantprogressnoticetext = visual.TextStim(self.participantwin, text='...', height = 0.03, pos=[-0.95,-0.95], alignHoriz = 'left', alignVert='bottom', color=self.participantmonitor.forgroundcolor, opacity=0.35, autoLog=False)
+                self.participantprogressnoticetext.setAutoDraw(True); self.participantwin.flip()
             
         
             ##### Parameter update ##### 
@@ -537,7 +550,15 @@ class Engine():
                             
                             self.participantwin.winHandle.maximize() 
                             self.participantwin.winHandle.activate()     
-                                
+                            
+                            if self.participantprogressnotice:
+                            
+                                tplace = self.participantprogressnotice[closestidx(numpy.asarray(self.participantprogressnotice), numpy.divide(self.trial, numpy.subtract(self.sequencelistL,self.trial)))]
+                                tplace = round(numpy.multiply(tplace,100), 0)
+                                self.participantprogressnoticetext.setText('%.0f%% Complete.' % (tplace))
+                                #except:
+                                #pass
+                            
                             #####  Prepare for trial #####
                             
                             # Load information for the current trial
@@ -1234,6 +1255,9 @@ class Engine():
                             self.experimenterbuttonticks[n].setAutoDraw(False)
                         for n in range(0,20):
                             self.experimentertrackers[n].setAutoDraw(False)
+                
+            if self.participantprogressnotice:
+                self.participantprogressnoticetext.setAutoDraw(False); self.participantwin.flip()
                 
                 # Flip the windows
                 self.participantwin.flip()
