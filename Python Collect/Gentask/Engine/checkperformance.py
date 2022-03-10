@@ -1,5 +1,6 @@
 import os
 from os.path import exists
+import re
 from sys import platform
 try:
     import Engine.xcat as xcat
@@ -36,6 +37,55 @@ try:
 except:
     pass
 
+
+def performancelogger(fileout='performancelog.csv', textout=[]):
+    if len(textout) > 0:
+        # see if we need to create the file or if it already exists
+        if not (os.path.isfile(fileout)): 
+            f = open(fileout, 'w')
+        else:
+            f = open(fileout, 'a')
+
+        for n in range(0,len(textout)):
+            if isinstance(textout[n], str):
+                f.write('%s' % (textout[n]))
+            elif isinstance(textout[n], float):
+                f.write('%.5f' % (textout[n]))
+            elif isinstance(textout[n], int):
+                f.write('%d' % (textout[n]))
+            
+            if n < (len(textout)-1):
+                f.write(', ')
+                
+        f.write('\n')
+        f.close()
+        
+def logval(loglist, label, value, scale=False, biggerisbetter=True):
+    
+    newvallist = []
+    newvallist.append(label)
+    newvallist.append('')
+    
+    try:
+        newvallist[1] = value
+    except:
+        pass
+        
+    if isinstance(newvallist[1], float):
+        # must have put something in there 
+        if scale:
+            try:
+                valout = numpy.multiply(numpy.subtract(newvallist[1], scale[0]) / numpy.subtract(scale[1], scale[0]),100)
+                if not biggerisbetter:
+                    valout = numpy.subtract(100, valout)
+                newvallist[1] = valout
+            except:
+                newvallist[1] = ''
+
+    loglist.append(newvallist[0])
+    loglist.append(newvallist[1])
+    
+
 def performancereporter(task):
     gc.collect()
     showoutput = False
@@ -63,11 +113,15 @@ def performancereporter(task):
             # flanker task
             [eggchunk, wavechunk, barchunks] = checkflankerperf(task, showoutput)
             
+        elif filin[0:3] == 'GNG':
+            # go nogo task
+            [eggchunk, wavechunk, barchunks] = checkgonogoperf(task, showoutput)
+            
         elif filin[0:3] == 'N2B':
             # flanker task
             [eggchunk, wavechunk, barchunks] = checkn2backperf(task, showoutput)
             
-        elif filin[0:3] == 'CN2B':
+        elif filin[0:4] == 'CN2B':
             # flanker task
             [eggchunk, wavechunk, barchunks] = checkcontinousn2backperf(task, showoutput)
     if _baractive:
@@ -293,6 +347,11 @@ def centerprompt(toplevel):
 def checkoddballperf(task, show=True):   
     
     barchunks = None
+    logtext = []
+    logtext.append('filename')
+    tempval = task.outputfile.split('.')[0]
+    tempval = re.split('\/', tempval)
+    logtext.append(tempval[len(tempval)-1])
     
     # Check Performance Settings using xcat
     datapull = [[0, 0], [0, 0], [0, 0]]
@@ -322,6 +381,9 @@ def checkoddballperf(task, show=True):
     Speed.biggerisbetter = False
     Speed.unit = ' ms'
     
+    logval(logtext, 'TargetSpeed', datapull[0][0], scale=False)
+    logval(logtext, 'TargetSpeedNorm', datapull[0][0], scale=Speed.scale, biggerisbetter=Speed.biggerisbetter)
+
     Consistency = eegpipe.barplotprep()
     Consistency.title = 'Consistency'
     Consistency.labels = ['Target', 'Nontarget']
@@ -330,6 +392,9 @@ def checkoddballperf(task, show=True):
     Consistency.biggerisbetter = False
     Consistency.unit = ' ms'
     
+    logval(logtext, 'TargetConsistency', datapull[1][0], scale=False)
+    logval(logtext, 'TargetConsistencyNorm', datapull[1][0], scale=Consistency.scale, biggerisbetter=Consistency.biggerisbetter)
+
     # d prime
     HR = numpy.divide(datapull[2][0],100)
     if HR > 0.99: 
@@ -349,6 +414,10 @@ def checkoddballperf(task, show=True):
     Prime.scale = [-1, 4.65]
     Prime.biggerisbetter = True
     Prime.unit = ''
+    
+    logval(logtext, 'AccuracyDprime', dprime, scale=False)
+    logval(logtext, 'AccuracyDprimeNorm', dprime, scale=Prime.scale, biggerisbetter=Prime.biggerisbetter)
+    
     
     barchunks = [Speed, Consistency, Prime]
     
@@ -404,6 +473,9 @@ def checkoddballperf(task, show=True):
             Orientation.biggerisbetter = True
             Orientation.unit = ' microV'
             barchunks.append(Orientation)
+            
+            logval(logtext, 'Orientation', Orientation.values[0], scale=False)
+            logval(logtext, 'OrientationNorm', Orientation.values[0], scale=Orientation.scale, biggerisbetter=Orientation.biggerisbetter)
             
             # snag waveform
             distractorwave = eegpipe.waveformplotprep()
@@ -466,6 +538,10 @@ def checkoddballperf(task, show=True):
             Attention.unit = ' microV'
             barchunks.append(Attention)
             
+            logval(logtext, 'Attention', Attention.values[0], scale=False)
+            logval(logtext, 'AttentionNorm', Attention.values[0], scale=Attention.scale, biggerisbetter=Attention.biggerisbetter)
+            
+            
             Processing = eegpipe.barplotprep()
             Processing.title = 'Processing'
             Processing.labels = ['Target']
@@ -526,10 +602,18 @@ def checkoddballperf(task, show=True):
             for cA in range(len(eggchunk)):
                 eggchunk[cA].scale = eggscale
         
+        
+    performancelogger(fileout=r'C:\Studies\PythonCollect7\oddballperformancelog.csv', textout=logtext)
+        
     return [eggchunk, wavechunk, barchunks] 
 
 def checkflankerperf(task, show=True):    
     barchunks = None
+    logtext = []
+    logtext.append('filename')
+    tempval = task.outputfile.split('.')[0]
+    tempval = re.split('\/', tempval)
+    logtext.append(tempval[len(tempval)-1])
     
     ###### Post task options ######################################################################################
     
@@ -568,6 +652,9 @@ def checkflankerperf(task, show=True):
     Speed.biggerisbetter = False
     Speed.unit = ' ms'
     
+    logval(logtext, 'Speed', datapull[0][0], scale=False)
+    logval(logtext, 'SpeedNorm', datapull[0][0], scale=Speed.scale, biggerisbetter=Speed.biggerisbetter)
+    
     Consistency = eegpipe.barplotprep()
     Consistency.title = 'Consistency'
     Consistency.labels = ['All']
@@ -576,13 +663,27 @@ def checkflankerperf(task, show=True):
     Consistency.biggerisbetter = False
     Consistency.unit = ' ms'
     
+    logval(logtext, 'Consistency', datapull[1][0], scale=False)
+    logval(logtext, 'ConsistencyNorm', datapull[1][0], scale=Consistency.scale, biggerisbetter=Consistency.biggerisbetter)
+    
     Accuracy = eegpipe.barplotprep()
     Accuracy.title = 'Inhibition'
     Accuracy.labels = ['All']
-    Accuracy.values =  [datapull[2][2]]
+    
+    outval = datapull[2][2]
+    if (datapull[2][2] > datapull[2][1]): 
+        # cong is worse than incong, so remove the half difference in accuracy
+        # 100 for inc and 75 for cong - 100-12.5 = 87.5
+        # 100 for inc and 0 for cong - 100 - 50 = 50
+        # 85 for inc and 80 for cong - 85 - 2.5 = 82.5
+        outval = numpy.subtract(outval, numpy.divide(numpy.subtract(datapull[2][2],datapull[2][1]),2))
+    Accuracy.values =  [outval]
     Accuracy.scale = [75, 100]
     Accuracy.biggerisbetter = True
     Accuracy.unit = ' %'
+    
+    logval(logtext, 'Inhibition', outval, scale=False)
+    logval(logtext, 'InhibitionNorm', outval, scale=Accuracy.scale, biggerisbetter=Accuracy.biggerisbetter)
     
     barchunks = [Speed, Consistency, Accuracy]
     
@@ -643,6 +744,9 @@ def checkflankerperf(task, show=True):
             Attention.unit = ' microV'
             barchunks.append(Attention)
             
+            logval(logtext, 'Attention', Attention.values[0], scale=False)
+            logval(logtext, 'AttentionNorm', Attention.values[0], scale=Attention.scale, biggerisbetter=Attention.biggerisbetter)
+            
             Processing = eegpipe.barplotprep()
             Processing.title = 'Processing'
             Processing.labels = ['Target']
@@ -651,6 +755,9 @@ def checkflankerperf(task, show=True):
             Processing.biggerisbetter = False
             Processing.unit = ' ms'
             barchunks.append(Processing)
+            
+            logval(logtext, 'Processing', Processing.values[0], scale=False)
+            logval(logtext, 'ProcessingNorm', Processing.values[0], scale=Processing.scale, biggerisbetter=Processing.biggerisbetter)
             
             
             # snag waveform
@@ -739,6 +846,9 @@ def checkflankerperf(task, show=True):
             Monitoring.unit = ' microV'
             barchunks.append(Monitoring)
             
+            logval(logtext, 'Monitoring', Monitoring.values[0], scale=False)
+            logval(logtext, 'MonitoringNorm', Monitoring.values[0], scale=Monitoring.scale, biggerisbetter=Monitoring.biggerisbetter)
+            
             # snag waveform
             errorwave = eegpipe.waveformplotprep()
             errorwave.title = 'Monitoring'
@@ -788,12 +898,310 @@ def checkflankerperf(task, show=True):
                 eggchunk.append(erroregg) 
             
 
+    performancelogger(fileout=r'C:\Studies\PythonCollect7\flankerperformancelog.csv', textout=logtext)
+    return [eggchunk, wavechunk, barchunks] 
+
+
+def checkgonogoperf(task, show=True):
+    barchunks = None
+    logtext = []
+    logtext.append('filename')
+    tempval = task.outputfile.split('.')[0]
+    tempval = re.split('\/', tempval)
+    logtext.append(tempval[len(tempval)-1])
+    
+    ###### Post task options ######################################################################################
+    
+    
+    ### Pull behavioral performance
+    #task.outputfile = 'Raw\OBReportTest.psydat'
+    
+    # Check Performance Settings using xcat
+    datapull = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
+    taskoutput = xcat.BehavioralAnalysis()
+    taskoutput.run(inputfile = task.outputfile, trialtypes = [11, 21, 12, 22])
+    if show:
+        taskoutput.show(label = 'Go', header = True)
+    datapull[0][0] = taskoutput.meanrt
+    datapull[1][0] = taskoutput.sdrt
+    datapull[2][0] = taskoutput.responseaccuracy
+    taskoutput.run(inputfile = task.outputfile, trialtypes = [31, 41])
+    if show:
+        taskoutput.show(label = 'Nogo Go')
+    datapull[0][1] = taskoutput.meanrt
+    datapull[1][1] = taskoutput.sdrt
+    datapull[2][1] = taskoutput.responseaccuracy
+    taskoutput.run(inputfile = task.outputfile, trialtypes = [32, 42])
+    if show:
+        taskoutput.show(label = 'Nogo Nogo')
+    datapull[0][2] = taskoutput.meanrt
+    datapull[1][2] = taskoutput.sdrt
+    datapull[2][2] = taskoutput.responseaccuracy
+    taskoutput.run(inputfile = task.outputfile, trialtypes = [31, 41, 32, 42])
+    if show:
+        taskoutput.show(label = 'Nogo')
+    datapull[0][3] = taskoutput.meanrt
+    datapull[1][3] = taskoutput.sdrt
+    datapull[2][3] = taskoutput.responseaccuracy
+    
+    # send data to reporting window
+    Speed = eegpipe.barplotprep()
+    Speed.title = 'Speed'
+    Speed.labels = ['Go']
+    Speed.values = [datapull[0][0]]
+    Speed.scale = [300, 900]
+    Speed.biggerisbetter = False
+    Speed.unit = ' ms'
+
+    logval(logtext, 'Speed', datapull[0][0], scale=False)	
+    logval(logtext, 'SpeedNorm', datapull[0][0], scale=Speed.scale, biggerisbetter=Speed.biggerisbetter)
+
+
+    Consistency = eegpipe.barplotprep()
+    Consistency.title = 'Consistency'
+    Consistency.labels = ['Go']
+    Consistency.values = [datapull[1][0]]
+    Consistency.scale = [30, 200]
+    Consistency.biggerisbetter = False
+    Consistency.unit = ' ms'
+
+    logval(logtext, 'Consistency', datapull[1][0], scale=False)	
+    logval(logtext, 'ConsistencyNorm', datapull[1][0], scale=Consistency.scale, biggerisbetter=Consistency.biggerisbetter)
+    
+    Accuracy = eegpipe.barplotprep()
+    Accuracy.title = 'Inhibition'
+    Accuracy.labels = ['Go', 'Nogo']
+    Accuracy.values =  [datapull[2][0], datapull[2][3]]
+    Accuracy.scale = [65, 100]
+    Accuracy.biggerisbetter = True
+    Accuracy.unit = ' %'
+    
+    logval(logtext, 'Inhibition', datapull[2][3], scale=False)	
+    logval(logtext, 'Inhibition Norm', datapull[2][3], scale=Accuracy.scale, biggerisbetter= Accuracy.biggerisbetter)
+
+    barchunks = [Speed, Consistency, Accuracy]
+    
+    
+    
+    ### Rapid Process EEG data ######################################################################################
+    if show:
+        print('\nPlease wait while the EEG data is rapid processed.')
+    eggchunk = None
+    wavechunk = None
+    
+    # if the task finished then pull the data
+    if task.finished and exists(task.outputfile.split('.')[0] + '.csv'):
+        EEG = eegpipe.readUnicornBlack(task.outputfile.split('.')[0] + '.csv')
+        EEG = eegpipe.simplefilter(EEG, Filter = 'Notch', Cutoff = [60.0])
+        EEG = eegpipe.simplefilter(EEG, Filter = 'Bandpass', Design = 'Butter', Cutoff = [0.5, 30.0], Order=3)
+        
+        # creates a stimulus locked model ERP.
+        [outsum, outvect, xtime] = eegpipe.createsignal(
+             Window = [-0.1, 1.0],
+             Latency =   [ 0.08,  0.25, 0.35],
+             Amplitude = [-0.1,  -0.45, 0.50],
+             Width =     [40,       80,  180],
+             Shape =     [0,         0,    0],
+             Smoothing = [0,         0,    0],
+             OverallSmooth = 20, 
+             Srate = 250.0)
+        
+        # Stimulus locked - 30
+        stimcodes = [32, 42] # NoGo Right
+        stimcodes = numpy.ndarray.tolist(numpy.add(stimcodes, 10000)) # only accept correct trials
+        EEGstim = None
+        try:
+            EEGstim = eegpipe.simpleepoch(EEG, Window = [-0.500, 1.000], Types = stimcodes)
+            EEGstim = eegpipe.simplebaselinecorrect(EEGstim, Window = [-0.100, 0.0])
+            EEGstim = eegpipe.pthreepipe(EEGstim)
+            if EEGstim.acceptedtrials > 5:
+                EEGstim = eegpipe.simpleaverage(EEGstim, Approach = 'Mean')
+                EEGstim = eegpipe.collapsechannels(EEGstim, Channels = ['CZ', 'CPZ', 'PZ', 'P3', 'P4', 'CP3', 'CP4', 'POZ'], NewChannelName='HOTSPOT', Approach='median')
+                EEGstim = eegpipe.simplefilter(EEGstim, Design = 'savitzky-golay', Order = 4)
+            else:
+                EEGstim = None
+        except:
+            EEGstim = None
+            
+        if EEGstim != None:
+            outputchannels = EEGstim.channels
+            
+            # place in bar
+            [outputamplitude, outputlatency] = eegpipe.extractpeaks(EEGstim, Window=[0.300, 0.700], Points=9, Surround=8)
+            Attention = eegpipe.barplotprep()
+            Attention.title = 'Attention'
+            Attention.labels = ['Nogo']
+            Attention.values = [outputamplitude[outputchannels.index('HOTSPOT')]]
+            Attention.scale = [0, 16]
+            Attention.biggerisbetter = True
+            Attention.unit = ' microV'
+            barchunks.append(Attention)
+
+            logval(logtext, 'Attention', Attention.values[0], scale=False)	
+            logval(logtext, 'AttentionNorm', Attention.values[0], scale=Attention.scale, biggerisbetter=Attention.biggerisbetter)
+            
+            Processing = eegpipe.barplotprep()
+            Processing.title = 'Processing'
+            Processing.labels = ['Nogo']
+            Processing.values = [numpy.multiply(outputlatency[outputchannels.index('HOTSPOT')],1000)]
+            Processing.scale = [300, 700]
+            Processing.biggerisbetter = False
+            Processing.unit = ' ms'
+            barchunks.append(Processing)
+            
+            logval(logtext, 'Processing', Processing.values[0], scale=False)	
+            logval(logtext, 'ProcessingNorm', Processing.values[0], scale=Processing.scale, biggerisbetter=Processing.biggerisbetter)
+
+            # snag waveform
+            targetwave = eegpipe.waveformplotprep()
+            targetwave.title = 'Nogo'
+            targetwave.x = EEGstim.times[eegpipe.closestidx(EEGstim.times, -0.100):eegpipe.closestidx(EEGstim.times, 1.000)]
+            targetwave.y = EEGstim.data[outputchannels.index('HOTSPOT')][eegpipe.closestidx(EEGstim.times, -0.100):eegpipe.closestidx(EEGstim.times, 1.000)]
+            targetwave.linestyle='solid'
+            targetwave.linecolor= '#3D5E73'
+            targetwave.lineweight=2
+            targetwave.fillbetween='ZeroP'
+            targetwave.fillwindow=[numpy.subtract(outputlatency[outputchannels.index('HOTSPOT')],0.1),numpy.add(outputlatency[outputchannels.index('HOTSPOT')],0.1)]
+            targetwave.fillbetweencolor='#3D5E73'
+            if wavechunk == None:
+                wavechunk = [targetwave]
+            else: 
+                wavechunk.append(targetwave)
+            
+            Reference = eegpipe.waveformplotprep()
+            Reference.title = 'Attention Reference'
+            Reference.x = xtime
+            Reference.y = numpy.multiply(outsum,8)
+            Reference.linestyle='dashed'
+            Reference.linecolor= '#999999'
+            Reference.lineweight=0.5
+            if wavechunk == None:
+                wavechunk = [Reference]
+            else: 
+                wavechunk.append(Reference)
+                
+                
+            # snag egghead
+            #outputamplitude = eegpipe.extractamplitude(EEGdist, Window=[0.300, 0.600], Approach='mean')
+            targetegg = eegpipe.eggheadplotprep()
+            targetegg.title = 'Nogo'
+            targetegg.channels = outputchannels
+            targetegg.amplitudes = outputamplitude  
+            targetegg.scale = [0, 1]
+            if outputamplitude[outputchannels.index('HOTSPOT')] > targetegg.scale[1]:
+                targetegg.scale[1] = outputamplitude[outputchannels.index('HOTSPOT')]
+            targetegg.opacity = 0.2 
+            if eggchunk == None:
+                eggchunk = [targetegg]
+            else: 
+                eggchunk.append(targetegg) 
+                
+                
+                
+            
+        # Feedback locked - 51 errors of commission
+        EEGresp = None
+        [outsum, outvect, xtime] = eegpipe.createsignal(
+             Window =    [-0.500,  1.0],
+             Latency =   [-0.10, 0.15],
+             Amplitude = [-0.5, 0.25],
+             Width =     [100,   180],
+             Shape =     [0,    0],
+             Smoothing = [0,    0],
+             OverallSmooth = 20, 
+             Srate = 250.0)
+        
+        try:
+            EEGresp = eegpipe.simpleepoch(EEG, Window = [-0.500, 1.000], Types = [51, 10051])
+            EEGresp = eegpipe.simplebaselinecorrect(EEGresp, Window = [-0.500, -0.200])
+            EEGresp = eegpipe.ernpipe(EEGresp)
+            if EEGresp.acceptedtrials > 2:
+                EEGresp = eegpipe.simpleaverage(EEGresp, Approach = 'Mean')
+                EEGresp = eegpipe.collapsechannels(EEGresp, Channels = ['FZ', 'FC1', 'FC2', 'CZ'], NewChannelName='HOTSPOT', Approach='median')
+                EEGresp = eegpipe.simplefilter(EEGresp, Design = 'savitzky-golay', Order = 4)
+            else:
+                EEGresp = None
+        except:
+            EEGresp = None
+        
+        if EEGresp != None:
+            outputchannels = EEGresp.channels
+            
+            # place in bar
+            [outputamplitude, outputlatency] = eegpipe.extractpeaks(EEGresp, Window=[-0.200, 0.100], Direction='min', Points=9, Surround=8)
+            Monitoring = eegpipe.barplotprep()
+            Monitoring.title = 'Monitoring'
+            Monitoring.labels = ['Error']
+            Monitoring.values = [outputamplitude[outputchannels.index('HOTSPOT')]]
+            Monitoring.scale = [-10, 0]
+            Monitoring.biggerisbetter = False
+            Monitoring.unit = ' microV'
+            barchunks.append(Monitoring)
+
+            logval(logtext, 'Monitoring', Monitoring.values[0], scale=False)	
+            logval(logtext, 'MonitoringNorm', Monitoring.values[0], scale=Monitoring.scale, biggerisbetter=Monitoring.biggerisbetter)
+            
+            # snag waveform
+            errorwave = eegpipe.waveformplotprep()
+            errorwave.title = 'Monitoring'
+            errorwave.x = EEGresp.times[eegpipe.closestidx(EEGresp.times, -0.300):eegpipe.closestidx(EEGresp.times, 0.200)]
+            errorwave.y = EEGresp.data[outputchannels.index('HOTSPOT')][eegpipe.closestidx(EEGresp.times, -0.300):eegpipe.closestidx(EEGresp.times, 0.200)]
+            errorwave.linestyle='solid'
+            errorwave.linecolor= '#EF9A35'
+            errorwave.lineweight=2
+            errorwave.fillbetween='ZeroN'
+            errorwave.fillwindow=[numpy.subtract(outputlatency[outputchannels.index('HOTSPOT')],0.1),numpy.add(outputlatency[outputchannels.index('HOTSPOT')],0.1)]
+            errorwave.fillbetweencolor='#EF9A35'
+            if wavechunk == None:
+                wavechunk = [errorwave]
+            else: 
+                wavechunk.append(errorwave)
+                
+            ErrReference = eegpipe.waveformplotprep()
+            ErrReference.title = 'Monitoring Reference'
+            ErrReference.x = xtime[eegpipe.closestidx(xtime, -0.300):eegpipe.closestidx(xtime, 0.200)]
+            ErrReference.y = numpy.multiply(outsum,8)[eegpipe.closestidx(xtime, -0.300):eegpipe.closestidx(xtime, 0.200)]
+            ErrReference.linestyle='dashed'
+            ErrReference.linecolor= '#999999'
+            ErrReference.lineweight=0.5
+            if wavechunk == None:
+                wavechunk = [ErrReference]
+            else: 
+                wavechunk.append(ErrReference)
+            
+        
+            segs = ['#F593FA', '#9F71E3', '#7729F0', '#350C8F','#23248F', '#1C2C75', '#00004B'] 
+            newcmap = LinearSegmentedColormap.from_list("", segs, 256) 
+            
+            # snag egghead
+            #outputamplitude = eegpipe.extractamplitude(EEGdist, Window=[0.300, 0.600], Approach='mean')
+            erroregg = eegpipe.eggheadplotprep()
+            erroregg.title = 'Monitoring'
+            erroregg.channels = outputchannels
+            erroregg.amplitudes = outputamplitude 
+            erroregg.colormap = newcmap
+            erroregg.scale = [0, 1]
+            if outputamplitude[outputchannels.index('HOTSPOT')] < erroregg.scale[0]:
+                erroregg.scale[0] = outputamplitude[outputchannels.index('HOTSPOT')]
+            erroregg.opacity = 0.2 
+            if eggchunk == None:
+                eggchunk = [erroregg]
+            else: 
+                eggchunk.append(erroregg) 
+            
+
+    performancelogger(fileout=r'C:\Studies\PythonCollect7\gonogoperformancelog.csv', textout=logtext)
     return [eggchunk, wavechunk, barchunks] 
 
 
 def checkn2backperf(task, show=True):   
     
     barchunks = None
+    logtext = []
+    logtext.append('filename')
+    tempval = task.outputfile.split('.')[0]
+    tempval = re.split('\/', tempval)
+    logtext.append(tempval[len(tempval)-1])
     
     
     # Check Performance Settings using xcat
@@ -827,6 +1235,10 @@ def checkn2backperf(task, show=True):
     Speed.biggerisbetter = False
     Speed.unit = ' ms'
     
+    logval(logtext, 'Speed', Speed.values[0], scale=False)
+    logval(logtext, 'SpeedNorm', Speed.values[0], scale=Speed.scale, biggerisbetter=Speed.biggerisbetter)
+        
+    
     Consistency = eegpipe.barplotprep()
     Consistency.title = 'Consistency'
     Consistency.labels = ['All']
@@ -835,6 +1247,9 @@ def checkn2backperf(task, show=True):
     Consistency.biggerisbetter = False
     Consistency.unit = ' ms'
     
+    logval(logtext, 'Consistency', Consistency.values[0], scale=False)
+    logval(logtext, 'ConsistencyNorm', Consistency.values[0], scale=Consistency.scale, biggerisbetter=Consistency.biggerisbetter)
+    
     Accuracy = eegpipe.barplotprep()
     Accuracy.title = 'Accuracy'
     Accuracy.labels = ['All']
@@ -842,6 +1257,9 @@ def checkn2backperf(task, show=True):
     Accuracy.scale = [60, 100]
     Accuracy.biggerisbetter = True
     Accuracy.unit = ' %'
+    
+    logval(logtext, 'Accuracy', Accuracy.values[0], scale=False)
+    logval(logtext, 'AccuracyNorm', Accuracy.values[0], scale=Accuracy.scale, biggerisbetter=Accuracy.biggerisbetter)
     
     # d prime
     HR = numpy.divide(datapull[2][1],100)
@@ -862,6 +1280,9 @@ def checkn2backperf(task, show=True):
     Prime.scale = [-1, 4.65]
     Prime.biggerisbetter = True
     Prime.unit = ''
+    
+    logval(logtext, 'Dprime', Prime.values[0], scale=False)
+    logval(logtext, 'DprimeNorm', Prime.values[0], scale=Prime.scale, biggerisbetter=Prime.biggerisbetter)
     
     barchunks = [Speed, Consistency, Accuracy, Prime]
     
@@ -920,6 +1341,9 @@ def checkn2backperf(task, show=True):
             Attention.unit = ' microV'
             barchunks.append(Attention)
             
+            logval(logtext, 'Attention', Attention.values[0], scale=False)
+            logval(logtext, 'AttentionNorm', Attention.values[0], scale=Attention.scale, biggerisbetter=Attention.biggerisbetter)
+            
             Processing = eegpipe.barplotprep()
             Processing.title = 'Processing'
             Processing.labels = ['Target']
@@ -928,6 +1352,9 @@ def checkn2backperf(task, show=True):
             Processing.biggerisbetter = False
             Processing.unit = ' ms'
             barchunks.append(Processing)
+            
+            logval(logtext, 'Processing', Processing.values[0], scale=False)
+            logval(logtext, 'ProcessingNorm', Processing.values[0], scale=Processing.scale, biggerisbetter=Processing.biggerisbetter)
             
             # snag waveform
             targetwave = eegpipe.waveformplotprep()
@@ -1012,6 +1439,9 @@ def checkn2backperf(task, show=True):
             Monitoring.unit = ' microV'
             barchunks.append(Monitoring)
             
+            logval(logtext, 'Monitoring', Monitoring.values[0], scale=False)
+            logval(logtext, 'MonitoringNorm', Monitoring.values[0], scale=Monitoring.scale, biggerisbetter=Monitoring.biggerisbetter)
+            
             # snag waveform
             errorwave = eegpipe.waveformplotprep()
             errorwave.title = 'Monitoring'
@@ -1058,12 +1488,18 @@ def checkn2backperf(task, show=True):
             else: 
                 eggchunk.append(erroregg) 
     
+    performancelogger(fileout=r'C:\Studies\PythonCollect7\twobackperformancelog.csv', textout=logtext)
     return [eggchunk, wavechunk, barchunks] 
 
 
 def checkcontinousn2backperf(task, show=True):   
     
     barchunks = None
+    logtext = []
+    logtext.append('filename')
+    tempval = task.outputfile.split('.')[0]
+    tempval = re.split('\/', tempval)
+    logtext.append(tempval[len(tempval)-1])
     
     ###### Post task options ######################################################################################
     
@@ -1090,6 +1526,9 @@ def checkcontinousn2backperf(task, show=True):
     Speed.biggerisbetter = False
     Speed.unit = ' ms'
     
+    logval(logtext, 'Speed', Speed.values[0], scale=False)
+    logval(logtext, 'SpeedNorm', Speed.values[0], scale=Speed.scale, biggerisbetter=Speed.biggerisbetter)
+    
     Consistency = eegpipe.barplotprep()
     Consistency.title = 'Consistency'
     Consistency.labels = ['Consistency']
@@ -1098,6 +1537,9 @@ def checkcontinousn2backperf(task, show=True):
     Consistency.biggerisbetter = False
     Consistency.unit = ' ms'
     
+    logval(logtext, 'Consistency', Consistency.values[0], scale=False)
+    logval(logtext, 'ConsistencyNorm', Consistency.values[0], scale=Consistency.scale, biggerisbetter=Consistency.biggerisbetter)
+    
     Accuracy = eegpipe.barplotprep()
     Accuracy.title = 'Accuracy'
     Accuracy.labels = ['Accuracy']
@@ -1105,6 +1547,9 @@ def checkcontinousn2backperf(task, show=True):
     Accuracy.scale = [60, 100]
     Accuracy.biggerisbetter = True
     Accuracy.unit = ' %'
+    
+    logval(logtext, 'Accuracy', Accuracy.values[0], scale=False)
+    logval(logtext, 'AccuracyNorm', Accuracy.values[0], scale=Accuracy.scale, biggerisbetter=Accuracy.biggerisbetter)
     
     barchunks = [Speed, Consistency, Accuracy]
     
@@ -1159,6 +1604,9 @@ def checkcontinousn2backperf(task, show=True):
             Monitoring.unit = ' microV'
             barchunks.append(Monitoring)
             
+            logval(logtext, 'Monitoring', Monitoring.values[0], scale=False)
+            logval(logtext, 'MonitoringNorm', Monitoring.values[0], scale=Monitoring.scale, biggerisbetter=Monitoring.biggerisbetter)
+            
             # snag waveform
             errorwave = eegpipe.waveformplotprep()
             errorwave.title = 'Monitoring'
@@ -1207,6 +1655,7 @@ def checkcontinousn2backperf(task, show=True):
                 eggchunk.append(erroregg) 
     
     
+    performancelogger(fileout=r'C:\Studies\PythonCollect7\continuoustwobackperformancelog.csv', textout=logtext)
     return [eggchunk, wavechunk, barchunks] 
 
 class Engine():
