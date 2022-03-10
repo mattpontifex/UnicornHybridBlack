@@ -196,6 +196,6 @@ if __name__ == "__main__":
 
     task = selectscreen()
     task.controls = ['1_CheckSignal.py', '3_ChangeDevice.py', '2_CheckPerformance.py']
-    task.tasks = ['OddballTask.py', 'FlankerTask.py', 'NbackTask_2back.py', 'ContinuousNbackTask_2back.py']
-    task.taskaltlabels = ['Oddball Detection Task', 'Flanker Arrow Task', '2 Back Task', 'Continuous 2 Back Task']
+    task.tasks = ['OddballTask.py', 'FlankerTask.py', 'NogoTask.py', 'NbackTask_2back.py', 'ContinuousNbackTask_2back.py']
+    task.taskaltlabels = ['Oddball Detection Task', 'Flanker Arrow Task',  'Response Task',  '2 Back Task', 'Continuous 2 Back Task']
     task.show()
