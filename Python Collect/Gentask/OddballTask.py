@@ -8,6 +8,9 @@ if __name__ == "__main__":
     # Run -> Configuration per file... 
     # Change the Console to Execute in an external system terminal
     # Select the checkbox for External system terminal Interact with the Python console after execution
+
+    with open('UnicornDeviceID.txt', 'r') as f:
+        unicorndeviceid = f.read(); f.close()
     
     task = Engine()
     
@@ -41,7 +44,7 @@ if __name__ == "__main__":
     task.participantmonitor.forgroundcolor = '#FFFFFF' # RGB Codes (-1 to 1) or Hex Code
     
     # Device Settings
-    task.unicorn = 'UN-2019.05.51' # [] if using other system
+    task.unicorn = unicorndeviceid
     task.unicornchannels = 'FZ, FC1, FC2, CP3, CPZ, CP4, PZ, POZ, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
     
     # Begin the Task

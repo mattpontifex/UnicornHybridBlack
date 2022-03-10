@@ -9,6 +9,7 @@ if __name__ == "__main__":
     task = Viewer()
 
     task.unicornchannels = 'FZ, FC1, FC2, CP3, CPZ, CP4, PZ, POZ, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Battery, Sample'
-    task.unicorn = 'UN-2019.05.51' 
-    task.updatetime = 220 # make larger if app starts hanging
+    with open('UnicornDeviceID.txt', 'r') as f:
+        task.unicorn = f.read(); f.close()
+    task.updatetime = 500 # make larger if app starts hanging
     task.run()
