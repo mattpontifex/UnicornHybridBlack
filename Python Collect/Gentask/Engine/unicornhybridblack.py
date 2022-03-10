@@ -137,23 +137,20 @@ def UnicornGroomQuality(datavector, controlband, noiseband, samplefreq, scale, h
     # function to evaluate quality of signal
     signalnoiseratio = []
     signalvariability = []
-    
     datavector = numpy.ravel(datavector)
-
     _power, _freqs = UnicornGroomPSD(datavector, samplefreq=samplefreq, scale=scale)
     controlpower = numpy.median(_power[numpy.argmin(abs(_freqs-(controlband[0]))):numpy.argmin(abs(_freqs-(controlband[1])))])
     noisepower = numpy.mean(_power[numpy.argmin(abs(_freqs-(noiseband[0]))):numpy.argmin(abs(_freqs-(noiseband[1])))])
-
+    
     if (float(controlpower) == float(0.0)):
         controlpower = 0.0001
                 
     signalnoiseratio = numpy.around(numpy.divide(noisepower, controlpower), decimals=1) # frequency ratio
-                         
+                  
     datavector = UnicornGroomFilter(datavector, highpassfilter=highpassfilter, lowpassfilter=lowpassfilter, notchfilter=notchfilter, samplefreq=samplefreq)
     
     checkspan = int(math.floor((len(datavector) / 5.0))) * -1
     signalvariability = numpy.std(datavector[checkspan:-1])
-    
     return signalnoiseratio, signalvariability, datavector, _power, _freqs
 
 
@@ -197,8 +194,9 @@ def UnicornJockey(deviceID, channellabels, rollingspan, logfilename, printoutput
         if pulleegdata.is_set():
             sample = UnicornBlack.sample_data()
             #print('UnicornJockey: Battery at %0.1f percent' % numpy.array(sample)[-1,-3])
-            conn.send(sample[:])
-            pulleegdata.clear()
+            if len(sample) > 0:
+                conn.send(sample[:])
+                pulleegdata.clear()
 
 class UnicornBlackProcess():  
     # this will be the class that the user interfaces with that intializes and maintains the multiprocessing
@@ -320,6 +318,7 @@ class UnicornBlackThreads():
         self.data = None
         self.printoutput = True
         self.ready = True
+        self.deviceconnected = False
         
     
     def connect(self, deviceID=None, rollingspan=3.0, logfilename='default'):
@@ -362,64 +361,73 @@ class UnicornBlackThreads():
                 
         # Open selected device.
         try:
-            self.device = UnicornPy.Unicorn(self.deviceID)
+            self.deviceconnected = 0
+            try:
+                self.device = UnicornPy.Unicorn(self.deviceID)
+                self.deviceconnected = 1
+            except:
+                pass 
             
-            # Initialize acquisition members.
-            self._rollingspan = rollingspan # seconds
-            self._logchunksize = int(math.floor(5 * self._samplefreq))
+            if self.deviceconnected == 1:
+                # Initialize acquisition members.
+                self._rollingspan = rollingspan # seconds
+                self._logchunksize = int(math.floor(5 * self._samplefreq))
+                        
+                self._numberOfAcquiredChannels = self.device.GetNumberOfAcquiredChannels()
+                self._configuration = self.device.GetConfiguration()
+            
+                # Allocate memory for the acquisition buffer.
+                self._receiveBufferBufferLength = self._frameLength * self._numberOfAcquiredChannels * 4
+                self._receiveBuffer = bytearray(self._receiveBufferBufferLength)
+                self.data = [[0.0] * self._numberOfAcquiredChannels] * math.floor( float(self._rollingspan) * float(self._samplefreq) )
+                        
+                try:
+                    # initialize sample streamer
+                    self._streaming = True
+                    self._ssthread = Thread(target=self._stream_samples, args=[self._logsamplequeue], daemon=True)
+                    self._ssthread.name = 'samplestreamer'
+                except:
+                    print("Error initializing sample streamer.")
+                
                     
-            self._numberOfAcquiredChannels = self.device.GetNumberOfAcquiredChannels()
-            self._configuration = self.device.GetConfiguration()
-        
-            # Allocate memory for the acquisition buffer.
-            self._receiveBufferBufferLength = self._frameLength * self._numberOfAcquiredChannels * 4
-            self._receiveBuffer = bytearray(self._receiveBufferBufferLength)
-            self.data = [[0.0] * self._numberOfAcquiredChannels] * math.floor( float(self._rollingspan) * float(self._samplefreq) )
+                try:
+                    # initialize data recorder
+                    self._recording = True
+                    self._drthread = Thread(target=self._log_sample, args=[self._logsamplequeue], daemon=True)
+                    self._drthread.name = 'datarecorder'
                     
-            try:
-                # initialize sample streamer
-                self._streaming = True
-                self._ssthread = Thread(target=self._stream_samples, args=[self._logsamplequeue], daemon=True)
-                self._ssthread.name = 'samplestreamer'
-            except:
-                print("Error initializing sample streamer.")
-            
+                except:
+                    print("Error initializing data recorder.")
+                    
+                    
+                try:
+                    # initialize event recorder
+                    self._eventrecording = True
+                    self._erthread = Thread(target=self._log_event, args=[self._logeventqueue], daemon=True)
+                    self._erthread.name = 'eventrecorder'
+                    
+                except:
+                    print("Error initializing event recorder.")
+                    
+                    
+                try:
+                    # start processes
+                    self.device.StartAcquisition(False)  # True - test signal; False - measurement mode
+                except:
+                    print("Error starting acquisition.")
+                    
+                self.logdata = False
+                self._ssthread.start()
+                self._drthread.start()
+                self._erthread.start()
                 
-            try:
-                # initialize data recorder
-                self._recording = True
-                self._drthread = Thread(target=self._log_sample, args=[self._logsamplequeue], daemon=True)
-                self._drthread.name = 'datarecorder'
+                time.sleep(1) # give it some initialization time
                 
-            except:
-                print("Error initializing data recorder.")
-                
-                
-            try:
-                # initialize event recorder
-                self._eventrecording = True
-                self._erthread = Thread(target=self._log_event, args=[self._logeventqueue], daemon=True)
-                self._erthread.name = 'eventrecorder'
-                
-            except:
-                print("Error initializing event recorder.")
-                
-                
-            try:
-                # start processes
-                self.device.StartAcquisition(False)  # True - test signal; False - measurement mode
-            except:
-                print("Error starting acquisition.")
-                
-            self.logdata = False
-            self._ssthread.start()
-            self._drthread.start()
-            self._erthread.start()
-            
-            time.sleep(1) # give it some initialization time
-            
-            if self.printoutput:
-                print("Connected to '%s'." %self.deviceID)
+                if self.printoutput:
+                    print("Connected to '%s'." %self.deviceID)
+            else:
+                if self.printoutput:
+                    print("Unable to connect to '%s'." %self.deviceID)
         except:
             if self.printoutput:
                 print("Unable to connect to '%s'." %self.deviceID)
@@ -665,7 +673,10 @@ class UnicornBlackThreads():
         self._safetolog = boolsafe  
         
     def sample_data(self):
-        datasample = self.data[:]
+        try:
+            datasample = self.data[:]
+        except:
+            datasample = []
         return datasample
             
     def check_battery(self):
@@ -685,9 +696,9 @@ class UnicornBlackThreads():
 if __name__ == "__main__":
     
     duration = 5 # seconds
-    example = 'Process' # Process or Thread
+    example = 'Thread' # Process or Thread
     
-    if example == 'Process':
+    if example == 'Thread':
         # Example code for calling the Unicorn device as a process
         UnicornBlack = UnicornBlackProcess()  
     else:    
