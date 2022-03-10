@@ -95,7 +95,7 @@ def createoddballsequence(filout = [], cycles = [], parameters=[]):
                     tout = parameters[4]
                 else:
                     tout = 0
-                
+#                
             f.write(str(tout)) # Write data as a string to file
             if (i < len(newvarlabels)): f.write(',') # Include Comma between each item
         f.write('\n') # Write end of line character 
@@ -141,6 +141,996 @@ def createoddballsequence(filout = [], cycles = [], parameters=[]):
         f.write('\n') # Write end of line character 
     
     f.close() # close file 
+    
+    
+
+def createnogosequence(filout = [], cycles = [], style=0, mask=[], parameters=[], variableiti=[], feedback=[]):
+    # Example Code:
+    # createnogosequence(filout = 'S:\Data\Raw\randomsequence.csv', cycles = 1, parameters = [100, 80, 1000, 1500, ['j']], variableiti=250, feedback = [])
+    
+    # populate headers
+    newvarlabels = ['stimulusFile','preStimulusInterval','stimulusDuration','stimulusDuration_min','responseWindow_min','responseWindow_max','stimulusITI','postResponseInterval','stimulusXcoord','stimulusYcoord', 'correctResp','stimulusCode','maskFile','feedbackDuration','preFeedbackDelay','endFeedbackWithResponse','correctResponseStimulusFile','correctResponseCode','commissionErrorStimulusFile','commissionErrorCode', 'omissionErrorStimulusFile','omissionErrorCode','impulsiveErrorStimulusFile','impulsiveErrorCode','delayErrorStimulusFile','delayErrorCode']
+    
+    # Populate database with variable names
+    f = open(filout, 'w') # Write Variable Labels to Database - Any original file is overwritten
+    for i in newvarlabels:
+        f.write(i)   # Write variable to file
+        if (i != newvarlabels[-1]): f.write(',') # Insert Comma between each variable
+    f.write('\n') # Write end of line character
+    
+    # write instruction prompt into beginning of file 
+    dummytrials = ['nothing.png', 'GoInstruct.png', 'NogoInstruct.png', 'NogoInstruct2.png']
+    for cT in range(len(dummytrials)): # loop through each trial
+        
+        for i in range(len(newvarlabels)):
+            tout = 0
+            
+            if newvarlabels[i] == 'stimulusFile':
+                tout = dummytrials[cT]
+                
+            if newvarlabels[i] == 'stimulusDuration':
+                if dummytrials[cT] == 'nothing.png':
+                    tout = 500.0
+                else:
+                    tout = 10000.0
+                
+            if newvarlabels[i] == 'stimulusDuration_min':
+                tout = parameters[1]
+                
+            if newvarlabels[i] == 'responseWindow_min':
+                tout = parameters[1]
+                
+            if newvarlabels[i] == 'responseWindow_max':
+                if dummytrials[cT] == 'nothing.png':
+                    tout = 500.0
+                else:
+                    tout = 10000.0
+                
+            if newvarlabels[i] == 'postResponseInterval':
+                if dummytrials[cT] == 'nothing.png':
+                    tout = 500.0
+                else:
+                    tout = 500.0
+                
+            if newvarlabels[i] == 'correctResp':
+                tout = parameters[4][0]
+                    
+            f.write(str(tout)) # Write data as a string to file
+            if (i < len(newvarlabels)): f.write(',') # Include Comma between each item
+        f.write('\n') # Write end of line character 
+    
+    
+    # write a few practice trials into beginning of file
+    dummytrials = [8, 8, 9]
+    for cT in range(len(dummytrials)): # loop through each trial
+        
+        for i in range(len(newvarlabels)):
+            tout = 0
+            
+            if newvarlabels[i] == 'stimulusFile':
+                if dummytrials[cT] in [8]:
+                    tout = 'GNG_Target.png'
+                elif dummytrials[cT] in [9]:
+                    tout = 'GNG_Nogo.png'
+                
+            if newvarlabels[i] == 'stimulusDuration':
+                tout = numpy.multiply(parameters[2], 2)
+                
+            if newvarlabels[i] == 'stimulusDuration_min':
+                tout = parameters[1]
+                
+            if newvarlabels[i] == 'responseWindow_min':
+                tout = parameters[1]
+                
+            if newvarlabels[i] == 'responseWindow_max':
+                tout = parameters[2]
+                
+            if dummytrials[cT] == 8:
+                if newvarlabels[i] == 'postResponseInterval':
+                    tout = 1000.0
+            else:
+                if newvarlabels[i] == 'stimulusITI':
+                    tout = parameters[3]
+                
+            if newvarlabels[i] == 'correctResp':
+                if dummytrials[cT] == 8:
+                    tout = parameters[4][0]
+                else:
+                    tout = 0
+            
+            if mask == 1:
+                if newvarlabels[i] == 'maskFile':
+                    tout = 'NG_Mask.png'
+                    
+            if len(feedback) > 0:
+                # feedback only for target trials
+                if newvarlabels[i] == 'feedbackDuration':
+                    tout = feedback[0]
+                    
+                if feedback[1] != 0:
+                    if newvarlabels[i] == 'correctResponseStimulusFile':
+                        if dummytrials[cT] in [8]:
+                            tout = 'GNG_GoCorrect.png'
+                        elif dummytrials[cT] in [9]:
+                            tout = 'GNG_NogoCorrect.png'
+                        
+                    if newvarlabels[i] == 'correctResponseCode':
+                        tout = 50
+                        
+                if feedback[2] != 0:
+                    if newvarlabels[i] == 'commissionErrorStimulusFile':
+                        if dummytrials[cT] in [8]:
+                            tout = 'GNG_GoError.png'
+                        elif dummytrials[cT] in [9]:
+                            tout = 'GNG_NogoError.png'
+                        
+                    if newvarlabels[i] == 'commissionErrorCode':
+                        tout = 51
+                        
+                if feedback[3] != 0:
+                    if newvarlabels[i] == 'omissionErrorStimulusFile':
+                        if dummytrials[cT] in [8]:
+                            tout = 'GNG_GoError.png'
+                        elif dummytrials[cT] in [9]:
+                            tout = 'GNG_NogoError.png'
+                        
+                    if newvarlabels[i] == 'omissionErrorCode':
+                        tout = 52
+                        
+                if feedback[4] != 0:
+                    if newvarlabels[i] == 'impulsiveErrorStimulusFile':
+                        if dummytrials[cT] in [8]:
+                            tout = 'GNG_GoError.png'
+                        elif dummytrials[cT] in [9]:
+                            tout = 'GNG_NogoError.png'
+                        
+                    if newvarlabels[i] == 'impulsiveErrorCode':
+                        tout = 53
+                        
+                if feedback[5] != 0:
+                    if newvarlabels[i] == 'delayErrorStimulusFile':
+                        if dummytrials[cT] in [8]:
+                            tout = 'GNG_GoError.png'
+                        elif dummytrials[cT] in [9]:
+                            tout = 'GNG_NogoError.png'
+                        
+                    if newvarlabels[i] == 'delayErrorCode':
+                        tout = 54
+                    
+            f.write(str(tout)) # Write data as a string to file
+            if (i < len(newvarlabels)): f.write(',') # Include Comma between each item
+        f.write('\n') # Write end of line character 
+    
+
+    # write nogo task trials
+    blocks = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    blocks = blocks * cycles
+    random.shuffle(blocks)
+    sequence = [[]]
+    
+    for cB in range(len(blocks)):
+        newsequence = [0] * 4
+        
+        if (blocks[cB] == 1):
+            newsequence = [12, 10, 22, 20]
+            
+        elif (blocks[cB] == 2):
+            newsequence = [10, 12, 20, 22]
+            
+        elif (blocks[cB] == 3):
+            newsequence = [12,	20,	22,	12,	10,	22]
+            
+        elif (blocks[cB] == 4):
+            newsequence = [10,	22,	20,	10,	12,	20]
+            
+        elif (blocks[cB] == 5):
+            newsequence = [12, 22, 20, 10, 22, 12, 10, 20]
+            
+        elif (blocks[cB] == 6):
+            newsequence = [20,	22,	12,	20,	12,	10,	20,	10]
+            
+        elif (blocks[cB] == 7):
+            newsequence = [22,	20,	10,	22,	10,	12,	22,	12]
+            
+        elif (blocks[cB] == 8):
+            newsequence = [22,	10,	20,	12,	10,	22,	10,	20]
+            
+        elif (blocks[cB] == 9):
+            newsequence = [20,	12,	22,	10,	12,	20,	12,	22]
+    
+        if cB == 0:
+            sequence = sequence + [newsequence]
+        else:
+            sequence = sequence + [newsequence[0:len(newsequence)]]
+        
+    sequence = [item for sublist in sequence for item in sublist]
+    
+    # determine trial type
+    typecode = [0] * len(sequence)
+    respcode = [0] * len(sequence)
+    gocode = 11
+    nogocode = 42
+    for cT in range(len(sequence)):
+        # 10, 12, 20 - go             
+        # 22 - nogo
+        
+        typecode[cT] = sequence[cT]
+        tempcode = 0
+    
+        # code current direction
+        if sequence[cT] == 10 or sequence[cT] == 12 or sequence[cT] == 20:
+            # go
+            tempcode = gocode
+            respcode[cT] = parameters[4][0]
+        else:
+            # nogo
+            tempcode = nogocode
+            respcode[cT] = 0
+            
+        typecode[cT] = tempcode
+                
+        
+    # allow ITI to vary
+    itilist = [parameters[4]] * len(sequence)
+    if not variableiti == 0:
+        # varies the ITI using a gaussian distribution
+        tempitilist = numpy.random.normal(loc=parameters[3], scale=variableiti, size=len(sequence))
+        for cT in range(len(tempitilist)):
+            # force the value to be in multiples of the screen refresh rate - assume 120 hz
+            tempiti = round(numpy.divide(tempitilist[cT], 8.3),0)
+            itilist[cT] = round(numpy.multiply(tempiti, 8.3),0)
+    
+    
+    for cT in range(len(sequence)): # loop through each trial
+        for i in range(len(newvarlabels)):
+            tout = 0
+            
+            if newvarlabels[i] == 'stimulusFile':
+                if typecode[cT] in [gocode]:
+                    tout = 'GNG_Target.png'
+                elif typecode[cT] in [nogocode]:
+                    tout = 'GNG_Nogo.png'
+                
+            if newvarlabels[i] == 'stimulusDuration':
+                tout = parameters[0]
+                
+            if newvarlabels[i] == 'stimulusDuration_min':
+                tout = parameters[1]
+                
+            if newvarlabels[i] == 'responseWindow_min':
+                tout = parameters[1]
+                
+            if newvarlabels[i] == 'responseWindow_max':
+                tout = parameters[2]
+                
+            if newvarlabels[i] == 'stimulusITI':
+                tout = parameters[3]
+                
+            if newvarlabels[i] == 'correctResp':
+                tout = respcode[cT]
+                
+            if newvarlabels[i] == 'stimulusCode':
+                tout = typecode[cT]
+            
+            if mask == 1:
+                if newvarlabels[i] == 'maskFile':
+                    tout = 'NG_Mask.png'
+                    
+            if len(feedback) > 0:
+                # feedback only for target trials
+                if newvarlabels[i] == 'feedbackDuration':
+                    tout = feedback[0]
+                    
+                if feedback[1] != 0:
+                    if newvarlabels[i] == 'correctResponseStimulusFile':
+                        if typecode[cT] in [gocode]:
+                            tout = 'GNG_GoCorrect.png'
+                        elif typecode[cT] in [nogocode]:
+                            tout = 'GNG_NogoCorrect.png'
+                        
+                    if newvarlabels[i] == 'correctResponseCode':
+                        tout = 50
+                        
+                if feedback[2] != 0:
+                    if newvarlabels[i] == 'commissionErrorStimulusFile':
+                        if typecode[cT] in [gocode]:
+                            tout = 'GNG_GoError.png'
+                        elif typecode[cT] in [nogocode]:
+                            tout = 'GNG_NogoError.png'
+                        
+                    if newvarlabels[i] == 'commissionErrorCode':
+                        tout = 51
+                        
+                if feedback[3] != 0:
+                    if newvarlabels[i] == 'omissionErrorStimulusFile':
+                        if typecode[cT] in [gocode]:
+                            tout = 'GNG_GoError.png'
+                        elif typecode[cT] in [nogocode]:
+                            tout = 'GNG_NogoError.png'
+                        
+                    if newvarlabels[i] == 'omissionErrorCode':
+                        tout = 52
+                        
+                if feedback[4] != 0:
+                    if newvarlabels[i] == 'impulsiveErrorStimulusFile':
+                        if typecode[cT] in [gocode]:
+                            tout = 'GNG_GoError.png'
+                        elif typecode[cT] in [nogocode]:
+                            tout = 'GNG_NogoError.png'
+                        
+                    if newvarlabels[i] == 'impulsiveErrorCode':
+                        tout = 53
+                        
+                if feedback[5] != 0:
+                    if newvarlabels[i] == 'delayErrorStimulusFile':
+                        if typecode[cT] in [gocode]:
+                            tout = 'GNG_GoError.png'
+                        elif typecode[cT] in [nogocode]:
+                            tout = 'GNG_NogoError.png'
+                        
+                    if newvarlabels[i] == 'delayErrorCode':
+                        tout = 54
+            
+            f.write(str(tout)) # Write data as a string to file
+            if (i < len(newvarlabels)): f.write(',') # Include Comma between each item
+        f.write('\n') # Write end of line character 
+    
+    f.close() # close file 
+    
+def createkramernogosequence(filout = [], cycles = [], style=1, mask=[], parameters=[], variableiti=[], feedback=[]):
+    # Example Code:
+    # createnogosequence(filout = 'S:\Data\Raw\randomsequence.csv', cycles = 1, parameters = [100, 80, 1000, 1500, ['f','j']], variableiti=250, feedback = [])
+    
+    # populate headers
+    newvarlabels = ['stimulusFile','preStimulusInterval','stimulusDuration','stimulusDuration_min','responseWindow_min','responseWindow_max','stimulusITI','postResponseInterval','stimulusXcoord','stimulusYcoord', 'correctResp','stimulusCode','maskFile','feedbackDuration','preFeedbackDelay','endFeedbackWithResponse','correctResponseStimulusFile','correctResponseCode','commissionErrorStimulusFile','commissionErrorCode', 'omissionErrorStimulusFile','omissionErrorCode','impulsiveErrorStimulusFile','impulsiveErrorCode','delayErrorStimulusFile','delayErrorCode']
+    
+    # Populate database with variable names
+    f = open(filout, 'w') # Write Variable Labels to Database - Any original file is overwritten
+    for i in newvarlabels:
+        f.write(i)   # Write variable to file
+        if (i != newvarlabels[-1]): f.write(',') # Insert Comma between each variable
+    f.write('\n') # Write end of line character
+    
+    
+    # go sequence
+    if style == 1:
+        
+        # write a few practice trials into beginning of file
+        dummytrials = [8, 9, 9]
+        for cT in range(len(dummytrials)): # loop through each trial
+            
+            for i in range(len(newvarlabels)):
+                tout = 0
+                
+                if newvarlabels[i] == 'stimulusFile':
+                    if dummytrials[cT] in [8]:
+                        tout = 'GNG_Left.png'
+                    elif dummytrials[cT] in [9]:
+                        tout = 'GNG_Right.png'
+                    
+                if newvarlabels[i] == 'stimulusDuration':
+                    tout = numpy.multiply(parameters[2], 2)
+                    
+                if newvarlabels[i] == 'stimulusDuration_min':
+                    tout = parameters[1]
+                    
+                if newvarlabels[i] == 'responseWindow_min':
+                    tout = parameters[1]
+                    
+                if newvarlabels[i] == 'responseWindow_max':
+                    tout = parameters[2]
+                    
+                if newvarlabels[i] == 'postResponseInterval':
+                    tout = 1000.0
+                    
+                if newvarlabels[i] == 'correctResp':
+                    if dummytrials[cT] == 8:
+                        tout = parameters[4][0]
+                    else:
+                        tout = parameters[4][1]
+                    
+                if mask == 1:
+                    if newvarlabels[i] == 'maskFile':
+                        tout = 'G_Mask.png'
+                    
+                if len(feedback) > 0:
+                    # feedback only for target trials
+                    if newvarlabels[i] == 'feedbackDuration':
+                        tout = feedback[0]
+                        
+                    if feedback[1] != 0:
+                        if newvarlabels[i] == 'correctResponseStimulusFile':
+                            if dummytrials[cT] in [8]:
+                                tout = 'GNG_LeftCorrect.png'
+                            elif dummytrials[cT] in [9]:
+                                tout = 'GNG_RightCorrect.png'
+                            
+                        if newvarlabels[i] == 'correctResponseCode':
+                            tout = 50
+                            
+                    if feedback[2] != 0:
+                        if newvarlabels[i] == 'commissionErrorStimulusFile':
+                            if dummytrials[cT] in [8]:
+                                tout = 'GNG_LeftError.png'
+                            elif dummytrials[cT] in [9]:
+                                tout = 'GNG_RightError.png'
+                            
+                        if newvarlabels[i] == 'commissionErrorCode':
+                            tout = 51
+                            
+                    if feedback[3] != 0:
+                        if newvarlabels[i] == 'omissionErrorStimulusFile':
+                            if dummytrials[cT] in [8]:
+                                tout = 'GNG_LeftError.png'
+                            elif dummytrials[cT] in [9]:
+                                tout = 'GNG_RightError.png'
+                            
+                        if newvarlabels[i] == 'omissionErrorCode':
+                            tout = 52
+                            
+                    if feedback[4] != 0:
+                        if newvarlabels[i] == 'impulsiveErrorStimulusFile':
+                            if dummytrials[cT] in [8]:
+                                tout = 'GNG_LeftError.png'
+                            elif dummytrials[cT] in [9]:
+                                tout = 'GNG_RightError.png'
+                            
+                        if newvarlabels[i] == 'impulsiveErrorCode':
+                            tout = 53
+                            
+                    if feedback[5] != 0:
+                        if newvarlabels[i] == 'delayErrorStimulusFile':
+                            if dummytrials[cT] in [8]:
+                                tout = 'GNG_LeftError.png'
+                            elif dummytrials[cT] in [9]:
+                                tout = 'GNG_RightError.png'
+                            
+                        if newvarlabels[i] == 'delayErrorCode':
+                            tout = 54
+                        
+                f.write(str(tout)) # Write data as a string to file
+                if (i < len(newvarlabels)): f.write(',') # Include Comma between each item
+            f.write('\n') # Write end of line character 
+        
+        
+        # write go task trials
+        blocks = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+        blocks = blocks * cycles
+        random.shuffle(blocks)
+        sequence = [[]]
+        
+        for cB in range(len(blocks)):
+            newsequence = [0] * 4
+            
+            if (blocks[cB] == 1):
+                newsequence = [12, 10, 22, 20]
+                
+            elif (blocks[cB] == 2):
+                newsequence = [10, 12, 20, 22]
+                
+            elif (blocks[cB] == 3):
+                newsequence = [12,	20,	22,	12,	10,	22]
+                
+            elif (blocks[cB] == 4):
+                newsequence = [10,	22,	20,	10,	12,	20]
+                
+            elif (blocks[cB] == 5):
+                newsequence = [12, 22, 20, 10, 22, 12, 10, 20]
+                
+            elif (blocks[cB] == 6):
+                newsequence = [20,	22,	12,	20,	12,	10,	20,	10]
+                
+            elif (blocks[cB] == 7):
+                newsequence = [22,	20,	10,	22,	10,	12,	22,	12]
+                
+            elif (blocks[cB] == 8):
+                newsequence = [22,	10,	20,	12,	10,	22,	10,	20]
+                
+            elif (blocks[cB] == 9):
+                newsequence = [20,	12,	22,	10,	12,	20,	12,	22]
+        
+            if cB == 0:
+                sequence = sequence + [newsequence]
+            else:
+                sequence = sequence + [newsequence[0:len(newsequence)]]
+            
+        sequence = [item for sublist in sequence for item in sublist]
+        
+        # determine trial type
+        typecode = [0] * len(sequence)
+        respcode = [0] * len(sequence)
+        for cT in range(len(sequence)):
+            # 10, 20 - left             
+            # 12, 22 - right
+            
+            typecode[cT] = sequence[cT]
+            tempcode = 0
+        
+            # code current direction
+            if sequence[cT] == 10 or sequence[cT] == 20:
+                # left
+                tempcode = numpy.add(1, tempcode)
+                respcode[cT] = parameters[4][0]
+            else:
+                # right
+                tempcode = numpy.add(2, tempcode)
+                respcode[cT] = parameters[4][1]
+                
+            if cT == 0:
+                tempcode = numpy.add(10, tempcode)
+                
+            elif cT > 0:
+                
+                # code if a response change occurred
+                if (sequence[cT] == 10 or sequence[cT] == 20) and (sequence[cT-1] == 10 or sequence[cT-1] == 20):
+                    # left on both
+                    tempcode = numpy.add(10, tempcode)
+                elif (sequence[cT] == 12 or sequence[cT] == 22) and (sequence[cT-1] == 12 or sequence[cT-1] == 22):
+                    # right on both
+                    tempcode = numpy.add(10, tempcode)
+                else:
+                    # different
+                    tempcode = numpy.add(20, tempcode)
+                
+            # Same L - 11
+            # Same R - 12
+            # Different L - 21
+            # Different R - 22
+            typecode[cT] = tempcode
+                    
+            # Left - 11, 21
+            # Right - 12, 22
+            
+        # allow ITI to vary
+        itilist = [parameters[4]] * len(sequence)
+        if not variableiti == 0:
+            # varies the ITI using a gaussian distribution
+            tempitilist = numpy.random.normal(loc=parameters[3], scale=variableiti, size=len(sequence))
+            for cT in range(len(tempitilist)):
+                # force the value to be in multiples of the screen refresh rate - assume 120 hz
+                tempiti = round(numpy.divide(tempitilist[cT], 8.3),0)
+                itilist[cT] = round(numpy.multiply(tempiti, 8.3),0)
+        
+        
+        for cT in range(len(sequence)): # loop through each trial
+            for i in range(len(newvarlabels)):
+                tout = 0
+                
+                if newvarlabels[i] == 'stimulusFile':
+                    if typecode[cT] in [11, 21, 31, 41]:
+                        tout = 'GNG_Left.png'
+                    elif typecode[cT] in [12, 22, 32, 42]:
+                        tout = 'GNG_Right.png'
+                    
+                if newvarlabels[i] == 'stimulusDuration':
+                    tout = parameters[0]
+                    
+                if newvarlabels[i] == 'stimulusDuration_min':
+                    tout = parameters[1]
+                    
+                if newvarlabels[i] == 'responseWindow_min':
+                    tout = parameters[1]
+                    
+                if newvarlabels[i] == 'responseWindow_max':
+                    tout = parameters[2]
+                    
+                if newvarlabels[i] == 'stimulusITI':
+                    tout = parameters[3]
+                    
+                if newvarlabels[i] == 'correctResp':
+                    tout = respcode[cT]
+                    
+                if newvarlabels[i] == 'stimulusCode':
+                    tout = typecode[cT]
+                
+                if mask == 1:
+                    if newvarlabels[i] == 'maskFile':
+                        tout = 'G_Mask.png'
+                        
+                if len(feedback) > 0:
+                    # feedback only for target trials
+                    if newvarlabels[i] == 'feedbackDuration':
+                        tout = feedback[0]
+                        
+                    if feedback[1] != 0:
+                        if newvarlabels[i] == 'correctResponseStimulusFile':
+                            if typecode[cT] in [11, 21, 31, 41]:
+                                tout = 'GNG_LeftCorrect.png'
+                            elif typecode[cT] in [12, 22, 32, 42]:
+                                tout = 'GNG_RightCorrect.png'
+                            
+                        if newvarlabels[i] == 'correctResponseCode':
+                            tout = 50
+                            
+                    if feedback[2] != 0:
+                        if newvarlabels[i] == 'commissionErrorStimulusFile':
+                            if typecode[cT] in [11, 21, 31, 41]:
+                                tout = 'GNG_LeftError.png'
+                            elif typecode[cT] in [12, 22, 32, 42]:
+                                tout = 'GNG_RightError.png'
+                            
+                        if newvarlabels[i] == 'commissionErrorCode':
+                            tout = 51
+                            
+                    if feedback[3] != 0:
+                        if newvarlabels[i] == 'omissionErrorStimulusFile':
+                            if typecode[cT] in [11, 21, 31, 41]:
+                                tout = 'GNG_LeftError.png'
+                            elif typecode[cT] in [12, 22, 32, 42]:
+                                tout = 'GNG_RightError.png'
+                            
+                        if newvarlabels[i] == 'omissionErrorCode':
+                            tout = 52
+                            
+                    if feedback[4] != 0:
+                        if newvarlabels[i] == 'impulsiveErrorStimulusFile':
+                            if typecode[cT] in [11, 21, 31, 41]:
+                                tout = 'GNG_LeftError.png'
+                            elif typecode[cT] in [12, 22, 32, 42]:
+                                tout = 'GNG_RightError.png'
+                            
+                        if newvarlabels[i] == 'impulsiveErrorCode':
+                            tout = 53
+                            
+                    if feedback[5] != 0:
+                        if newvarlabels[i] == 'delayErrorStimulusFile':
+                            if typecode[cT] in [11, 21, 31, 41]:
+                                tout = 'GNG_LeftError.png'
+                            elif typecode[cT] in [12, 22, 32, 42]:
+                                tout = 'GNG_RightError.png'
+                            
+                        if newvarlabels[i] == 'delayErrorCode':
+                            tout = 54
+                
+                f.write(str(tout)) # Write data as a string to file
+                if (i < len(newvarlabels)): f.write(',') # Include Comma between each item
+            f.write('\n') # Write end of line character 
+        
+    
+    # nogo sequence
+    
+    # write instruction prompt into beginning of file 
+    dummytrials = ['nothing.png', 'GNG_Instruct4.png', 'GNG_Instruct5.png', 'GNG_Instruct6.png']
+    for cT in range(len(dummytrials)): # loop through each trial
+        
+        for i in range(len(newvarlabels)):
+            tout = 0
+            
+            if newvarlabels[i] == 'stimulusFile':
+                tout = dummytrials[cT]
+                
+            if newvarlabels[i] == 'stimulusDuration':
+                if dummytrials[cT] == 'nothing.png':
+                    tout = 500.0
+                else:
+                    tout = 10000.0
+                
+            if newvarlabels[i] == 'stimulusDuration_min':
+                tout = parameters[1]
+                
+            if newvarlabels[i] == 'responseWindow_min':
+                tout = parameters[1]
+                
+            if newvarlabels[i] == 'responseWindow_max':
+                if dummytrials[cT] == 'nothing.png':
+                    tout = 500.0
+                else:
+                    tout = 10000.0
+                
+            if newvarlabels[i] == 'postResponseInterval':
+                if dummytrials[cT] == 'nothing.png':
+                    tout = 500.0
+                else:
+                    tout = 500.0
+                
+            if newvarlabels[i] == 'correctResp':
+                tout = parameters[4][1]
+                    
+            f.write(str(tout)) # Write data as a string to file
+            if (i < len(newvarlabels)): f.write(',') # Include Comma between each item
+        f.write('\n') # Write end of line character 
+    
+    
+    # write a few practice trials into beginning of file
+    dummytrials = [8, 8, 9]
+    for cT in range(len(dummytrials)): # loop through each trial
+        
+        for i in range(len(newvarlabels)):
+            tout = 0
+            
+            if newvarlabels[i] == 'stimulusFile':
+                if dummytrials[cT] in [8]:
+                    tout = 'GNG_Left.png'
+                elif dummytrials[cT] in [9]:
+                    tout = 'GNG_Right.png'
+                
+            if newvarlabels[i] == 'stimulusDuration':
+                tout = numpy.multiply(parameters[2], 2)
+                
+            if newvarlabels[i] == 'stimulusDuration_min':
+                tout = parameters[1]
+                
+            if newvarlabels[i] == 'responseWindow_min':
+                tout = parameters[1]
+                
+            if newvarlabels[i] == 'responseWindow_max':
+                tout = parameters[2]
+                
+            if dummytrials[cT] == 8:
+                if newvarlabels[i] == 'postResponseInterval':
+                    tout = 1000.0
+            else:
+                if newvarlabels[i] == 'stimulusITI':
+                    tout = parameters[3]
+                
+            if newvarlabels[i] == 'correctResp':
+                if dummytrials[cT] == 8:
+                    tout = parameters[4][0]
+                else:
+                    tout = 0
+            
+            if mask == 1:
+                if newvarlabels[i] == 'maskFile':
+                    tout = 'NG_Mask.png'
+                    
+            if len(feedback) > 0:
+                # feedback only for target trials
+                if newvarlabels[i] == 'feedbackDuration':
+                    tout = feedback[0]
+                    
+                if feedback[1] != 0:
+                    if newvarlabels[i] == 'correctResponseStimulusFile':
+                        if dummytrials[cT] in [8]:
+                            tout = 'GNG_LeftCorrect.png'
+                        elif dummytrials[cT] in [9]:
+                            tout = 'GNG_RightCorrect.png'
+                        
+                    if newvarlabels[i] == 'correctResponseCode':
+                        tout = 50
+                        
+                if feedback[2] != 0:
+                    if newvarlabels[i] == 'commissionErrorStimulusFile':
+                        if dummytrials[cT] in [8]:
+                            tout = 'GNG_LeftError.png'
+                        elif dummytrials[cT] in [9]:
+                            tout = 'GNG_RightError.png'
+                        
+                    if newvarlabels[i] == 'commissionErrorCode':
+                        tout = 51
+                        
+                if feedback[3] != 0:
+                    if newvarlabels[i] == 'omissionErrorStimulusFile':
+                        if dummytrials[cT] in [8]:
+                            tout = 'GNG_LeftError.png'
+                        elif dummytrials[cT] in [9]:
+                            tout = 'GNG_RightError.png'
+                        
+                    if newvarlabels[i] == 'omissionErrorCode':
+                        tout = 52
+                        
+                if feedback[4] != 0:
+                    if newvarlabels[i] == 'impulsiveErrorStimulusFile':
+                        if dummytrials[cT] in [8]:
+                            tout = 'GNG_LeftError.png'
+                        elif dummytrials[cT] in [9]:
+                            tout = 'GNG_RightError.png'
+                        
+                    if newvarlabels[i] == 'impulsiveErrorCode':
+                        tout = 53
+                        
+                if feedback[5] != 0:
+                    if newvarlabels[i] == 'delayErrorStimulusFile':
+                        if dummytrials[cT] in [8]:
+                            tout = 'GNG_LeftError.png'
+                        elif dummytrials[cT] in [9]:
+                            tout = 'GNG_RightError.png'
+                        
+                    if newvarlabels[i] == 'delayErrorCode':
+                        tout = 54
+                    
+            f.write(str(tout)) # Write data as a string to file
+            if (i < len(newvarlabels)): f.write(',') # Include Comma between each item
+        f.write('\n') # Write end of line character 
+    
+    
+    # write nogo task trials
+    
+    blocks = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    blocks = blocks * cycles
+    random.shuffle(blocks)
+    sequence = [[]]
+    
+    for cB in range(len(blocks)):
+        newsequence = [0] * 4
+        
+        if (blocks[cB] == 1):
+            newsequence = [12, 10, 22, 20]
+            
+        elif (blocks[cB] == 2):
+            newsequence = [10, 12, 20, 22]
+            
+        elif (blocks[cB] == 3):
+            newsequence = [12,	20,	22,	12,	10,	22]
+            
+        elif (blocks[cB] == 4):
+            newsequence = [10,	22,	20,	10,	12,	20]
+            
+        elif (blocks[cB] == 5):
+            newsequence = [12, 22, 20, 10, 22, 12, 10, 20]
+            
+        elif (blocks[cB] == 6):
+            newsequence = [20,	22,	12,	20,	12,	10,	20,	10]
+            
+        elif (blocks[cB] == 7):
+            newsequence = [22,	20,	10,	22,	10,	12,	22,	12]
+            
+        elif (blocks[cB] == 8):
+            newsequence = [22,	10,	20,	12,	10,	22,	10,	20]
+            
+        elif (blocks[cB] == 9):
+            newsequence = [20,	12,	22,	10,	12,	20,	12,	22]
+    
+        if cB == 0:
+            sequence = sequence + [newsequence]
+        else:
+            sequence = sequence + [newsequence[0:len(newsequence)]]
+        
+    sequence = [item for sublist in sequence for item in sublist]
+    
+    # determine trial type
+    typecode = [0] * len(sequence)
+    respcode = [0] * len(sequence)
+    for cT in range(len(sequence)):
+        # 10, 20 - left             
+        # 12, 22 - right - Nogo trials
+        
+        typecode[cT] = sequence[cT]
+        tempcode = 0
+    
+        # code current direction
+        if sequence[cT] == 10 or sequence[cT] == 20:
+            # left
+            tempcode = numpy.add(1, tempcode)
+            respcode[cT] = parameters[4][0]
+        else:
+            # right
+            tempcode = numpy.add(2, tempcode)
+            respcode[cT] = 0
+            
+        if cT == 0:
+            tempcode = numpy.add(30, tempcode)
+            
+        elif cT > 0:
+            
+            # code if a response change occurred
+            if (sequence[cT] == 10 or sequence[cT] == 20) and (sequence[cT-1] == 10 or sequence[cT-1] == 20):
+                # left on both
+                tempcode = numpy.add(30, tempcode)
+            elif (sequence[cT] == 12 or sequence[cT] == 22) and (sequence[cT-1] == 12 or sequence[cT-1] == 22):
+                # right on both
+                tempcode = numpy.add(30, tempcode)
+            else:
+                # different
+                tempcode = numpy.add(40, tempcode)
+            
+        # Same L - 31
+        # Same R - 32
+        # Different L - 41
+        # Different R - 42
+        typecode[cT] = tempcode
+                
+        # Left - 31, 41
+        # Right - 32, 42
+        
+    # allow ITI to vary
+    itilist = [parameters[4]] * len(sequence)
+    if not variableiti == 0:
+        # varies the ITI using a gaussian distribution
+        tempitilist = numpy.random.normal(loc=parameters[3], scale=variableiti, size=len(sequence))
+        for cT in range(len(tempitilist)):
+            # force the value to be in multiples of the screen refresh rate - assume 120 hz
+            tempiti = round(numpy.divide(tempitilist[cT], 8.3),0)
+            itilist[cT] = round(numpy.multiply(tempiti, 8.3),0)
+    
+    
+    for cT in range(len(sequence)): # loop through each trial
+        for i in range(len(newvarlabels)):
+            tout = 0
+            
+            if newvarlabels[i] == 'stimulusFile':
+                if typecode[cT] in [11, 21, 31, 41]:
+                    tout = 'GNG_Left.png'
+                elif typecode[cT] in [12, 22, 32, 42]:
+                    tout = 'GNG_Right.png'
+                
+            if newvarlabels[i] == 'stimulusDuration':
+                tout = parameters[0]
+                
+            if newvarlabels[i] == 'stimulusDuration_min':
+                tout = parameters[1]
+                
+            if newvarlabels[i] == 'responseWindow_min':
+                tout = parameters[1]
+                
+            if newvarlabels[i] == 'responseWindow_max':
+                tout = parameters[2]
+                
+            if newvarlabels[i] == 'stimulusITI':
+                tout = parameters[3]
+                
+            if newvarlabels[i] == 'correctResp':
+                tout = respcode[cT]
+                
+            if newvarlabels[i] == 'stimulusCode':
+                tout = typecode[cT]
+            
+            if mask == 1:
+                if newvarlabels[i] == 'maskFile':
+                    tout = 'NG_Mask.png'
+                    
+            if len(feedback) > 0:
+                # feedback only for target trials
+                if newvarlabels[i] == 'feedbackDuration':
+                    tout = feedback[0]
+                    
+                if feedback[1] != 0:
+                    if newvarlabels[i] == 'correctResponseStimulusFile':
+                        if typecode[cT] in [11, 21, 31, 41]:
+                            tout = 'GNG_LeftCorrect.png'
+                        elif typecode[cT] in [12, 22, 32, 42]:
+                            tout = 'GNG_RightCorrect.png'
+                        
+                    if newvarlabels[i] == 'correctResponseCode':
+                        tout = 50
+                        
+                if feedback[2] != 0:
+                    if newvarlabels[i] == 'commissionErrorStimulusFile':
+                        if typecode[cT] in [11, 21, 31, 41]:
+                            tout = 'GNG_LeftError.png'
+                        elif typecode[cT] in [12, 22, 32, 42]:
+                            tout = 'GNG_RightError.png'
+                        
+                    if newvarlabels[i] == 'commissionErrorCode':
+                        tout = 51
+                        
+                if feedback[3] != 0:
+                    if newvarlabels[i] == 'omissionErrorStimulusFile':
+                        if typecode[cT] in [11, 21, 31, 41]:
+                            tout = 'GNG_LeftError.png'
+                        elif typecode[cT] in [12, 22, 32, 42]:
+                            tout = 'GNG_RightError.png'
+                        
+                    if newvarlabels[i] == 'omissionErrorCode':
+                        tout = 52
+                        
+                if feedback[4] != 0:
+                    if newvarlabels[i] == 'impulsiveErrorStimulusFile':
+                        if typecode[cT] in [11, 21, 31, 41]:
+                            tout = 'GNG_LeftError.png'
+                        elif typecode[cT] in [12, 22, 32, 42]:
+                            tout = 'GNG_RightError.png'
+                        
+                    if newvarlabels[i] == 'impulsiveErrorCode':
+                        tout = 53
+                        
+                if feedback[5] != 0:
+                    if newvarlabels[i] == 'delayErrorStimulusFile':
+                        if typecode[cT] in [11, 21, 31, 41]:
+                            tout = 'GNG_LeftError.png'
+                        elif typecode[cT] in [12, 22, 32, 42]:
+                            tout = 'GNG_RightError.png'
+                        
+                    if newvarlabels[i] == 'delayErrorCode':
+                        tout = 54
+            
+            f.write(str(tout)) # Write data as a string to file
+            if (i < len(newvarlabels)): f.write(',') # Include Comma between each item
+        f.write('\n') # Write end of line character 
+    
+    f.close() # close file 
+        
+    
+    
     
     
 def switchnumbers(sequence, x, y, z=999):
@@ -526,7 +1516,6 @@ def createflankersequence(filout = [], cycles = [], style = 1, parameters=[], va
     # Include cue masks
     # Letters or Arrows?
     # Flip mid task?
-    # response cues at bottom of screen?
     
     if len(feedback) > 0:
         tempfeedback = [0]*6
@@ -852,4 +1841,10 @@ def createflankersequence(filout = [], cycles = [], style = 1, parameters=[], va
             f.write('\n') # Write end of line character 
     
     f.close() # close file 
+    
+
+
+if __name__ == "__main__":
+
+    createnogosequence(filout = r'C:\Studies\Apollo\Working\Go-NoGo_Letters\randomsequence.csv', cycles = 1, parameters = [100, 80, 1000, 1500, ['f','j']], variableiti=250, feedback = [])
     
