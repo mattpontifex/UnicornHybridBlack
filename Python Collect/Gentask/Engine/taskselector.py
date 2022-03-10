@@ -108,11 +108,13 @@ class selectscreen():
         canvas.pack(side='bottom', fill = 'x')
         canvas.pack_propagate(0)
         
-        photoimage = ImageTk.PhotoImage(file="Engine" + os.path.sep + "eggheadframe1.png")
-        #photoimage = ImageTk.PhotoImage(file="Gentask" + os.path.sep + "Engine" + os.path.sep + "eggheadframe1.png")
-        
-        canvas.create_image(150, 50, image=photoimage, anchor="n")
-        
+        try:
+            photoimage = ImageTk.PhotoImage(file="Engine" + os.path.sep + "eggheadframe1.png")
+            #photoimage = ImageTk.PhotoImage(file="Gentask" + os.path.sep + "Engine" + os.path.sep + "eggheadframe1.png")
+            
+            canvas.create_image(150, 50, image=photoimage, anchor="n")
+        except:
+            pass
         
         leftbuttons = []
         temp = tkinter.Button(master=leftframesub[2], text='Check EEG Signal', font=(None, self.fontsize), 
@@ -127,12 +129,22 @@ class selectscreen():
         
         
         
-        temp = tkinter.Button(master=leftframesub[0], text='Recheck Task Performance', font=(None, int(numpy.multiply(self.fontsize,0.8))), 
+        temp = tkinter.Button(master=leftframesub[0], text='Select Unicorn Device', font=(None, int(numpy.multiply(self.fontsize,0.8))), 
                              justify='center', anchor='center', bd = buttonstyle[1],
                              fg=leftbuttoncolors[0], bg=leftbuttoncolors[1],
                              activeforeground=leftbuttoncolors[2], activebackground=leftbuttoncolors[3],
                              relief=buttonstyle[0], underline=-1,
                              command=lambda: self.buttonhit(self.controls[1]))
+        temp.pack(side='bottom', fill = 'x', padx=self.wsPad[0], pady=self.wsPad[1], ipady=numpy.multiply(self.fontsize, 0.7))
+        temp.pack_propagate(0)
+        leftbuttons.append(temp)
+        
+        temp = tkinter.Button(master=leftframesub[0], text='Recheck Task Performance', font=(None, int(numpy.multiply(self.fontsize,0.8))), 
+                             justify='center', anchor='center', bd = buttonstyle[1],
+                             fg=leftbuttoncolors[0], bg=leftbuttoncolors[1],
+                             activeforeground=leftbuttoncolors[2], activebackground=leftbuttoncolors[3],
+                             relief=buttonstyle[0], underline=-1,
+                             command=lambda: self.buttonhit(self.controls[2]))
         temp.pack(side='bottom', fill = 'x', padx=self.wsPad[0], pady=self.wsPad[1], ipady=numpy.multiply(self.fontsize, 0.7))
         temp.pack_propagate(0)
         leftbuttons.append(temp)
@@ -183,7 +195,7 @@ class selectscreen():
 if __name__ == "__main__":
 
     task = selectscreen()
-    task.controls = ['1_CheckSignal.py', '2_CheckPerformance.py']
+    task.controls = ['1_CheckSignal.py', '3_ChangeDevice.py', '2_CheckPerformance.py']
     task.tasks = ['OddballTask.py', 'FlankerTask.py', 'NbackTask_2back.py', 'ContinuousNbackTask_2back.py']
     task.taskaltlabels = ['Oddball Detection Task', 'Flanker Arrow Task', '2 Back Task', 'Continuous 2 Back Task']
     task.show()
