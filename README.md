@@ -12,6 +12,23 @@ multiprocessing, so you should change the settings to have Spyder run the task i
 -Change the Console to Execute in an external system terminal  
 -Select the checkbox for External system terminal Interact with the Python console after execution  
 
+Alternatively, if Anaconda is available as an Environmental Variable then it is possible to run the python collect
+package by clicking on the run me batch file.
+-Open system settings, search: Environmental Variables 
+-Select Edit the system environmental variables
+-Select Environmental Variables
+-Click on Path, Click on Edit, Click New
+-Add:
+-C:\ProgramData\Anaconda3\Library\bin\conda.bat
+-C:\ProgramData\Anaconda3\Scripts\conda.exe
+-C:\ProgramData\Anaconda3\condabin\conda.bat
+-Open the command prompt and run conda activate. If no errors pop up then the paths were added correctly.
+-Open up Anaconda Prompt and run as administrator, then run the following commands:
+-pip install PeakUtils
+-pip install lmfit
+-pip install psychopy==2021.2.3
+-pip install alive-progress
+
 
 Device access in Python
 ------------
