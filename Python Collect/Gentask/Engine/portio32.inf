@@ -1,0 +1,82 @@
+; Copyright Winford Engineering
+; PortIO32 System driver
+; INF File for driver installation on Windows 95/98/NT/2000/XP systems
+
+[Version]
+Signature="$Chicago$"
+Class = WinfordIO
+ClassGuid = {ADE50D0F-E431-4cb2-AC42-04FD9E1E7C17}
+Provider=%MFGNAME%
+DriverVer=07/05/2004,1.4
+
+[Manufacturer]
+%MFGNAME%=DeviceList
+
+[DestinationDirs]
+DefaultDestDir=10,System32\Drivers
+WinfordSupportFiles=11
+
+[SourceDisksFiles]
+portio32.sys=1
+portio32.dll=1
+
+[SourceDisksNames]
+1=%INSTDISK%,,,
+
+[DeviceList]
+%PORTIO32%=DriverInstall,Winford_IO
+
+;------------------------------------------------------------------------------
+;  Windows 2000 Sections
+;------------------------------------------------------------------------------
+
+; install class, Windows 2000:
+[ClassInstall32] 
+AddReg=_AddReg_ClassInstall
+
+[DriverInstall.NT]
+CopyFiles=DriverCopyFiles,WinfordSupportFiles
+
+[DriverCopyFiles]
+portio32.sys,,,2
+
+[DriverInstall.NT.Services]
+AddService=portio32,2,DriverService
+
+[DriverService]
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%10%\system32\drivers\portio32.sys
+
+;------------------------------------------------------------------------------
+;  Windows 98 Sections
+;------------------------------------------------------------------------------
+
+; install class, Windows 98:
+[ClassInstall] 
+AddReg=_AddReg_ClassInstall
+
+[DriverInstall]
+CopyFiles=WinfordSupportFiles
+
+
+;------------------------------------------------------------------------------
+; Common sections
+;------------------------------------------------------------------------------
+[WinfordSupportFiles]
+portio32.dll,,,2
+
+[_AddReg_ClassInstall]
+HKR,,,,"%ClassDisplayName%"
+HKR,,Icon,,"-5"
+
+;------------------------------------------------------------------------------
+;  String Definitions
+;------------------------------------------------------------------------------
+
+[Strings]
+MFGNAME="Winford Engineering"
+INSTDISK="Winford Engineering Installation Disk"
+PORTIO32="PortIO32 Port I/O Driver"
+ClassDisplayName="Winford Engineering I/O Devices"
