@@ -1,15 +1,6 @@
 function [EEG, command] = loadunicornhybridblack(fullfilename, varargin)
 %   Import an Unicorn Hybrid Black Collect file into EEGLAB. 
 %
-%   If a psydat file is availble to merge, the trial type in EEG.event is 
-%   modified based on the correctness of behavioral responses.
-%       Correct Trials are increased by 10,000 
-%       Error of Commission Trials are increased by 50,000
-%       Error of Omission Trials are increased by 60,000
-%       (i.e., type 27 would become 10,027 if correct; 50,027 if an
-%       incorrect response was made; and 60,027 if an incorrect
-%       non-response occurred)
-%
 %   Input Parameters:
 %        1    Specify the filename of the file (extension should be .csv).  
 %
@@ -128,7 +119,7 @@ function [EEG, command] = loadunicornhybridblack(fullfilename, varargin)
         end
         datacheck = sum(isnan(EEG.data(1,:)));
         if (datacheck > 2)
-            fprintf("Warning: A total of %d out of %d (%.1f%%) sampling points were dropped during collection", datacheck, EEG.pnts, (datacheck/EEG.pnts)*100)
+            fprintf('Warning: A total of %d out of %d (%.1f%%) sampling points were dropped during collection', datacheck, EEG.pnts, (datacheck/EEG.pnts)*100)
         end
         EEG.xmin = EEG.times(1);
         EEG.xmax = EEG.times(end);
@@ -155,9 +146,6 @@ function [EEG, command] = loadunicornhybridblack(fullfilename, varargin)
         end
         EEG.history = sprintf('%s\nEEG = loadunicornhybridblack(''%s%s'');', EEG.history, filepath, [name, datafileextension]);
         
-        % The Gain appears to be at 250 rather than 500
-        EEG.data = EEG.data * 2; % double the gain
-        
         % Put triggers in
         EEG.event = struct('type', [], 'latency', [], 'urevent', []);
         EEG.urevent = struct('type', [], 'latency', []);
@@ -176,6 +164,8 @@ function [EEG, command] = loadunicornhybridblack(fullfilename, varargin)
             Event = dataArray{:, 2};
             fclose(fileID);
             
+            Latency(strcmpi(Event, '0')) = [];
+            Event(strcmpi(Event, '0')) = [];
             
             for indxi = 1:size(Latency,1)
                 EEG.event(indxi).urevent = indxi;
@@ -191,34 +181,40 @@ function [EEG, command] = loadunicornhybridblack(fullfilename, varargin)
             
         end
         
+        % Handle Epoched Datasets
+        
         % Check to See if Behavioral Data is Available
+        % Neurscan STIM2 Data is stored with the same file type as the  EEG data in Curry 6 & 7 which is problematic
         % Check for PsychoPy .PSYDAT file
         % 'Trial','Event','Duration','ISI','ITI','Type','Resp','Correct','Latency','ClockLatency','Trigger','MinRespWin','MaxRespWin','Stimulus'
+        AltFile = [file '.psydat'];
         try
-            AltFile = [pathstr, filesep, name, '.psydat'];
-            if ~(exist(AltFile, 'file') == 0) 
-
-                fid = fopen(AltFile,'rt');
-                if (fid ~= -1)
-                    cell = textscan(fid,'%s');
-                    fclose(fid);
-                    cont = cell{1};
-
-                    % Check file version
-                    if strcmpi(cont(1,1),'gentask.....=') % Could be Neuroscan Stim2 or modified Psychopy formats
-                        if strcmpi(cont(2,1),'PsychoPy_Engine_3')
-                            EEG = importengine3psychopy(EEG, AltFile, 'Threshold', (16.67 * 4));
-                        end
-                    end
-                end
+            if ~strcmpi(r.AltFile, 'False')
+                AltFile = r.AltFile;
             end
         catch
             boolerr = 1;
         end
+        if ~(exist(AltFile, 'file') == 0) 
+
+            fid = fopen(AltFile,'rt');
+            if (fid ~= -1)
+                cell = textscan(fid,'%s');
+                fclose(fid);
+                cont = cell{1};
+
+                % Check file version
+                %if strcmpi(cont(1,1),'gentask.....=') % Could be Neuroscan Stim2 or modified Psychopy formats
+                %    if strcmpi(cont(2,1),'PsychoPy_Engine_3')
+                %        EEG = importengine3psychopy(EEG, AltFile, 'Force', r.Force, 'Skip', skipcodes);
+                %    end
+                %end
+            end
+        end
+        
         
         EEG = eeg_checkset(EEG);
         EEG.history = sprintf('%s\nEEG = eeg_checkset(EEG);', EEG.history);
-        
         
     end
 end
