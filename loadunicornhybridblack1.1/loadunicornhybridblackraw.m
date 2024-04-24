@@ -46,7 +46,7 @@ function [EEG, command] = loadunicornhybridblackraw(fullfilename, varargin)
         delimiter = ',';
         endRow = 1;
         formatSpec = '%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%[^\n\r]';
-        fileID = fopen(filename,'r');
+        fileID = fopen(fullfilename,'r');
         dataArray = textscan(fileID, formatSpec, endRow, 'Delimiter', delimiter, 'TextType', 'string', 'ReturnOnError', false, 'EndOfLine', '\r\n');
         fclose(fileID);
         headerlabels = {};
